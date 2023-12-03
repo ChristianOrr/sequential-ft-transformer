@@ -1,12 +1,16 @@
 import numpy as np
 import tensorflow as tf
-from transformer import TransformerBlock
 from tensorflow.keras.layers import (
     Dense,
     Flatten,
 )
 import math as m
-from embeddings import CEmbedding, NEmbedding
+
+from sequential_ft_transformer.transformer import TransformerBlock
+from sequential_ft_transformer.embeddings import (
+    CEmbedding, 
+    NEmbedding
+)
 
 class FTTransformerEncoder(tf.keras.Model):
     def __init__(
