@@ -1,1 +1,5 @@
-from sequential_ft_transformer import sequential_ft_transformer
+from sequential_ft_transformer import (
+    fttransformer,
+    embeddings,
+    transformer
+)
