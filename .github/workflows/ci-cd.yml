@@ -67,6 +67,7 @@ jobs:
           # This token is created automatically by GH Actions
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+            pip install python-semantic-release
             git config user.name github-actions
             git config user.email github-actions@github.com
             poetry run semantic-release publish
