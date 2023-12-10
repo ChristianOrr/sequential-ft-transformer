@@ -62,6 +62,9 @@ jobs:
       - name: Install package
         run: poetry install
 
+      - name: Build package
+        run: poetry build
+
       - name: Use Python Semantic Release to prepare release
         env:
           # This token is created automatically by GH Actions
