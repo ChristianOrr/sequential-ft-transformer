@@ -51,9 +51,6 @@ jobs:
         with:
           python-version: "3.10"
 
-      - name: Bump package version 
-        run: semantic-release version
-
       - name: Check-out repository
         uses: actions/checkout@v3
         with:
@@ -61,6 +58,12 @@ jobs:
 
       - name: Install poetry
         uses: snok/install-poetry@v1
+
+      - name: Install python-semantic-release
+        run: pip install python-semantic-release
+
+      - name: Bump package version 
+        run: semantic-release version
 
       - name: Install package
         run: poetry install
