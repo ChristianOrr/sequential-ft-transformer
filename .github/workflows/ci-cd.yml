@@ -63,6 +63,9 @@ jobs:
         run: pip install python-semantic-release
 
       - name: Bump package version 
+        env:
+          # This token is created automatically by GH Actions
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: semantic-release version
 
       - name: Install package
@@ -79,10 +82,6 @@ jobs:
             git config user.name github-actions
             git config user.email github-actions@github.com
             poetry run semantic-release publish
-
-      - name: display folder contents
-        run: |
-            ls
 
       - name: Publish to TestPyPI
         uses: pypa/gh-action-pypi-publish@release/v1
