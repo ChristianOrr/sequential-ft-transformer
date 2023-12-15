@@ -2,6 +2,25 @@
 
 
 
+## v0.0.1 (2023-12-15)
+
+### Unknown
+
+* fix (pipeline): added GH_TOKEN to version bump ([`beebd1a`](https://github.com/ChristianOrr/sequential-ft-transformer/commit/beebd1afbcc8d9869cde8da7689c76bdea0223d8))
+
+* fix (pipeline): semantic-release install ([`fdef5c0`](https://github.com/ChristianOrr/sequential-ft-transformer/commit/fdef5c0dfa6714445a5d224c959442a3a041a7ab))
+
+* fix (pipeline): semantic-release version ([`8597ab0`](https://github.com/ChristianOrr/sequential-ft-transformer/commit/8597ab03ac6110978f2bce3da1cbbe27efa51080))
+
+* fix (pipeline): added build command ([`31c45c5`](https://github.com/ChristianOrr/sequential-ft-transformer/commit/31c45c53bad5342975242a3a51db6b01f3c6f280))
+
+* test (pipeline): updated dist path ([`1d513da`](https://github.com/ChristianOrr/sequential-ft-transformer/commit/1d513da00d2d51de230dfe8bd5a1a1f80fa7b0f5))
+
+* test (pipeline): showing folder contents ([`265d807`](https://github.com/ChristianOrr/sequential-ft-transformer/commit/265d8070e74de816eb9838ef996b851db2c86f51))
+
+* fix (pipeline): install semantic release ([`0b8a89c`](https://github.com/ChristianOrr/sequential-ft-transformer/commit/0b8a89c9efc0b16270b4bd6eb3c1d6668f699e07))
+
+
 ## v0.0.0 (2023-12-09)
 
 ### Unknown
