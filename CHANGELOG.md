@@ -2,6 +2,27 @@
 
 
 
+## v0.0.2 (2023-12-16)
+
+### Build
+
+* build(package): commit parser options ([`96713de`](https://github.com/ChristianOrr/sequential-ft-transformer/commit/96713de09a2611bdd3181927dc6377fae9c806d3))
+
+### Fix
+
+* fix(package): package version ([`2c0e27c`](https://github.com/ChristianOrr/sequential-ft-transformer/commit/2c0e27cf727b5514f973148db0650ac16d219e6c))
+
+### Refactor
+
+* refactor(pipeline): added back semantic-release version ([`356760a`](https://github.com/ChristianOrr/sequential-ft-transformer/commit/356760aebd4be576569bfdafe717cbd32c06f30c))
+
+* refactor(pipeline): added verbose to publish command ([`fc8766f`](https://github.com/ChristianOrr/sequential-ft-transformer/commit/fc8766fd3c3a8a9cd9e5d97c7107825b2be00774))
+
+* refactor(pipeline): removed semantic-release version ([`f9367b0`](https://github.com/ChristianOrr/sequential-ft-transformer/commit/f9367b0057a2a116662cd445b396e8d3e81f7539))
+
+* refactor: updated build config version for toml ([`26cf97f`](https://github.com/ChristianOrr/sequential-ft-transformer/commit/26cf97feda3fda52ae9c21f354c1e5356c765d7a))
+
+
 ## v0.0.1 (2023-12-15)
 
 ### Unknown
