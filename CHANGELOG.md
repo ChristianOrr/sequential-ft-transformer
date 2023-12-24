@@ -2,6 +2,13 @@
 
 
 
+## v0.1.0 (2023-12-24)
+
+### Feature
+
+* feat(model): converted ft-transformer to tensorflow functional api ([`500dae6`](https://github.com/ChristianOrr/sequential-ft-transformer/commit/500dae68d18d405e57c464259daa372009cd40e4))
+
+
 ## v0.0.2 (2023-12-16)
 
 ### Build
