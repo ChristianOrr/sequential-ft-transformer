@@ -1,16 +1,201 @@
 import numpy as np
 import tensorflow as tf
+from keras import layers
 from tensorflow.keras.layers import (
     Dense,
     Flatten,
 )
 import math as m
 
-from sequential_ft_transformer.transformer import TransformerBlock
+from sequential_ft_transformer.transformer import TransformerBlock, transformer_block
 from sequential_ft_transformer.embeddings import (
+    cat_embedding,
+    num_embedding,
     CEmbedding, 
     NEmbedding
 )
+
+
+def ft_transformer_encoder(
+    numeric_inputs: layers.Input,
+    cat_inputs: layers.Input,
+    categorical_features: list,
+    numerical_features: list,
+    numerical_data: np.array,
+    feature_unique_counts: list,
+    task: str = None,
+    embedding_dim: int = 32,
+    depth: int = 4,
+    heads: int = 8,
+    attn_dropout: float = 0.1,
+    ff_dropout: float = 0.1,
+    numerical_embedding_type: str = 'linear',
+    numerical_bins: int = None,
+    ple_tree_params: dict = {},
+    explainable=False,       
+):
+    # Define the layers
+    # CLS token
+    w_init = tf.random_normal_initializer()
+    seq_length = 1
+    if numeric_inputs is not None:
+        batch_size = tf.shape(numeric_inputs)[0]
+    elif cat_inputs is not None:
+        batch_size = tf.shape(cat_inputs)[0]
+    else:
+        raise ValueError("Numeric and Categorical inputs are None.")
+
+    shape = tf.stack([batch_size, seq_length, embedding_dim], axis=0)
+    cls_weights = w_init(shape)
+    transformer_inputs = [cls_weights]
+
+
+    # If categorical features, add to list
+    if categorical_features is not None and cat_inputs is not None:
+        cat_embs = cat_embedding(
+            inputs=cat_inputs,
+            feature_names=categorical_features,
+            feature_unique_counts=feature_unique_counts,
+            emb_dim =embedding_dim
+        )
+        transformer_inputs += [cat_embs]
+    
+    # If numerical features, add to list
+    if numerical_features is not None and numeric_inputs is not None:
+        num_embs = num_embedding(
+            inputs=numeric_inputs,
+            feature_names=numerical_features, 
+            X=numerical_data, 
+            y=None,
+            task=task,
+            emb_dim=embedding_dim, 
+            emb_type=numerical_embedding_type, 
+            n_bins=numerical_bins,
+            tree_params=ple_tree_params
+        )
+
+        transformer_inputs += [num_embs]
+    
+    # Prepare for Transformer
+    transformer_inputs = tf.concat(transformer_inputs, axis=1)
+    importances = []
+
+    # Pass through Transformer blocks
+    for _ in range(depth):
+        if explainable:
+            transformer_inputs, att_weights = transformer_block(
+                transformer_inputs,
+                embedding_dim,
+                heads,
+                embedding_dim,
+                att_dropout=attn_dropout,
+                ff_dropout=ff_dropout,
+                explainable=explainable,
+                post_norm=False,  # FT-Transformer uses pre-norm
+            )
+            importances.append(tf.reduce_sum(att_weights[:, :, 0, :], axis=1))
+        else:
+            transformer_inputs = transformer_block(
+                transformer_inputs,
+                embedding_dim,
+                heads,
+                embedding_dim,
+                att_dropout=attn_dropout,
+                ff_dropout=ff_dropout,
+                explainable=explainable,
+                post_norm=False,  # FT-Transformer uses pre-norm
+            )
+
+    if explainable:
+        # Sum across the layers
+        importances = tf.reduce_sum(tf.stack(importances), axis=0) / (
+            depth * heads
+        )
+        return transformer_inputs, importances
+    else:
+        return transformer_inputs, None
+        
+
+
+
+def ft_transformer(
+    out_dim: int,
+    out_activation: str,
+    numerical_data: np.array,
+    feature_unique_counts: list,
+    categorical_features: list = None,
+    numerical_features: list = None,
+    embedding_dim: int = 32,
+    depth: int = 4,
+    heads: int = 8,
+    attn_dropout: float = 0.1,
+    ff_dropout: float = 0.1,
+    numerical_embedding_type: str = None,
+    explainable=False,      
+):
+    # mlp layers
+    ln = tf.keras.layers.LayerNormalization()
+    final_ff = Dense(embedding_dim//2, activation='relu')
+    output_layer = Dense(out_dim, activation=out_activation, name="output")
+
+    inputs_dict = dict()
+    empty_cat: bool = categorical_features is None
+    empty_numeric: bool = numerical_features is None
+
+    if empty_cat and empty_numeric:
+        raise ValueError("Both categorical and numerical features are missing. At least one is needed")
+    
+    if not empty_numeric:
+        numeric_input_shape = (len(numerical_features), )
+        numeric_inputs = layers.Input(shape=numeric_input_shape, name="numeric_inputs")
+        inputs_dict.update({"numeric_inputs": numeric_inputs})
+    else:
+        numeric_inputs = None
+
+    if not empty_cat:
+        cat_input_shape = (len(categorical_features), )
+        cat_inputs = layers.Input(shape=cat_input_shape, name="cat_inputs")
+        inputs_dict.update({"cat_inputs": cat_inputs})
+    else:
+        cat_inputs = None
+
+    x, expl = ft_transformer_encoder(
+        numeric_inputs=numeric_inputs,
+        cat_inputs=cat_inputs,
+        categorical_features=categorical_features,
+        numerical_features=numerical_features,
+        numerical_data=numerical_data,
+        feature_unique_counts=feature_unique_counts,
+        embedding_dim=embedding_dim,
+        depth=depth,
+        heads=heads,
+        attn_dropout=attn_dropout,
+        ff_dropout=ff_dropout,
+        numerical_embedding_type=numerical_embedding_type,
+        explainable=explainable,
+    )
+
+    layer_norm_cls = ln(x[:, 0, :])
+    layer_norm_cls = final_ff(layer_norm_cls)
+    output = output_layer(layer_norm_cls)
+
+    outputs_dict = {"output": output}
+    if explainable:
+        outputs_dict.update({"importances": expl})
+
+    model = tf.keras.Model(inputs=inputs_dict,
+                           outputs=outputs_dict,
+                           name="FT-Transformer")
+
+    return model
+
+
+
+
+
+
+# OLD CODE
+
 
 class FTTransformerEncoder(tf.keras.Model):
     def __init__(
