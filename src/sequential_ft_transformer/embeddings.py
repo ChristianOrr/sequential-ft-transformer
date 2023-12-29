@@ -91,6 +91,7 @@ def num_embedding(
     X: np.array,
     y: np.array = None,
     task: str = None,
+    seq_length: int = 1,
     emb_dim: int = 32,
     emb_type: str = 'linear',
     n_bins: int = 10,
@@ -129,26 +130,36 @@ def num_embedding(
     else:
         # Initialise linear layer
         w_init = tf.random_normal_initializer()
+        # linear_w = tf.Variable(
+        #     initial_value=w_init(
+        #         shape=(num_features, 1, emb_dim), dtype='float32' # features, n_bins, emb_dim
+        #     ), trainable=True)
+        # linear_b = tf.Variable(
+        #     w_init(
+        #         shape=(num_features, 1), dtype='float32' # features, n_bins, emb_dim
+        #     ), trainable=True)
         linear_w = tf.Variable(
             initial_value=w_init(
-                shape=(num_features, 1, emb_dim), dtype='float32' # features, n_bins, emb_dim
+                shape=(seq_length, num_features, 1, emb_dim), dtype='float32' # features, n_bins, emb_dim
             ), trainable=True)
         linear_b = tf.Variable(
             w_init(
-                shape=(num_features, 1), dtype='float32' # features, n_bins, emb_dim
+                shape=(seq_length, num_features, 1), dtype='float32' # features, n_bins, emb_dim
             ), trainable=True)
    
     if emb_type == 'ple':
         emb_columns = []
         for i, f in enumerate(feature_names):
-            embedded_col = linear_layers[f](embedding_layers[f](inputs[:, i]))
+            # embedded_col = linear_layers[f](embedding_layers[f](inputs[:, i]))
+            embedded_col = linear_layers[f](embedding_layers[f](inputs[:, :, i]))
             emb_columns.append(embedded_col)
         embs = tf.concat(emb_columns, axis=1)
         
     elif emb_type == 'periodic':
         embs = embedding_layer(inputs)
     else:
-        embs = tf.einsum('f n e, b f -> bfe', linear_w, inputs)
+        # embs = tf.einsum('f n e, b f -> bfe', linear_w, inputs)
+        embs = tf.einsum('s f n e, b s f -> bsfe', linear_w, inputs)
         embs = tf.nn.relu(embs + linear_b)
         
     return embs
@@ -173,10 +184,11 @@ def cat_embedding(
     emb_columns = []
     for i, f in enumerate(feature_names):
         # Directly pass the integer inputs to the embedding layer
-        embedded_col = emb_layers[f](inputs[:, i])
+        # embedded_col = emb_layers[f](inputs[:, i])
+        embedded_col = emb_layers[f](inputs[:, :, i])
         emb_columns.append(embedded_col)
 
-    embs = tf.stack(emb_columns, axis=1)
+    embs = tf.stack(emb_columns, axis=2)
     return embs
 
 
