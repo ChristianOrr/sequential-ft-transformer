@@ -2,6 +2,17 @@
 
 
 
+## v0.2.0 (2023-12-29)
+
+### Chore
+
+* chore(package): added pyarrow ([`c7b6a27`](https://github.com/ChristianOrr/sequential-ft-transformer/commit/c7b6a274b2aadc07eb3c3e3992939f4519a8f0c6))
+
+### Feature
+
+* feat(model): updated ft-transformer model to support sequential tabular data ([`95ae501`](https://github.com/ChristianOrr/sequential-ft-transformer/commit/95ae5010ab9b82c8528089fd968a89541179ce86))
+
+
 ## v0.1.0 (2023-12-24)
 
 ### Feature
