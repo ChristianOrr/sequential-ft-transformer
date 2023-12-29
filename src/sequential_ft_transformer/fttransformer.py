@@ -31,7 +31,7 @@ def ft_transformer_encoder(
     attn_dropout: float = 0.1,
     ff_dropout: float = 0.1,
     numerical_embedding_type: str = 'linear',
-    numerical_bins: int = None,
+    numerical_bins: int = 10,
     ple_tree_params: dict = {},
     explainable=False,       
 ):
@@ -153,7 +153,6 @@ def ft_transformer(
         raise ValueError("Both categorical and numerical features are missing. At least one is needed")
     
     if not empty_numeric:
-        # numeric_input_shape = (len(numerical_features), )
         numeric_input_shape = (seq_length, len(numerical_features), )
         numeric_inputs = layers.Input(shape=numeric_input_shape, name="numeric_inputs")
         inputs_dict.update({"numeric_inputs": numeric_inputs})
@@ -161,7 +160,6 @@ def ft_transformer(
         numeric_inputs = None
 
     if not empty_cat:
-        # cat_input_shape = (len(categorical_features), )
         cat_input_shape = (seq_length, len(categorical_features), )
         cat_inputs = layers.Input(shape=cat_input_shape, name="cat_inputs")
         inputs_dict.update({"cat_inputs": cat_inputs})
@@ -331,11 +329,8 @@ class FTTransformerEncoder(tf.keras.Model):
         for transformer in self.transformers:
             if self.explainable:
                 transformer_inputs, att_weights = transformer(transformer_inputs)
-                print(f"att_weights.shape: {att_weights.shape}")
                 alt_weights = att_weights[:, :, 0, :]
-                print(f"alt_weights.shape: {alt_weights.shape}")
                 agg_att = tf.reduce_sum(alt_weights, axis=1)
-                print(f"agg_att.shape: {agg_att.shape}")
                 importances.append(agg_att)
             else:
                 transformer_inputs = transformer(transformer_inputs)

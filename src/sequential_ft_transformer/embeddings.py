@@ -57,32 +57,56 @@ def ple(
 
 def periodic(
     inputs: layers.Input,
-    emb_dim, 
-    input_shape,
+    emb_dim,
+    seq_length, 
+    num_features,
     n_bins=50, 
     sigma=5,
 ):
-    
     # Create the state of the layer (weights)
     w_init = tf.random_normal_initializer(stddev=sigma)
+    p_shape = (seq_length, num_features, n_bins)
     p = tf.Variable(
-        initial_value=w_init(shape=(input_shape[-1], n_bins),
-                             dtype='float32'),
+        initial_value=w_init(
+            shape=p_shape,
+            dtype='float32'),
         trainable=True)
 
+    l_shape = (seq_length, num_features, n_bins*2, emb_dim)
     l = tf.Variable(
         initial_value=w_init(
-            shape=(input_shape[-1], n_bins*2, emb_dim), dtype='float32' # features, n_bins, emb_dim
+            shape=l_shape, 
+            dtype='float32' 
             ), trainable=True)
 
     # Defines the computation from inputs to outputs
     v = 2 * m.pi * p[None] * inputs[..., None]
     emb = tf.concat([tf.math.sin(v), tf.math.cos(v)], axis=-1)
-    emb = tf.einsum('fne, bfn -> bfe', l, emb)
+    emb = tf.einsum('sfne, bsfn -> bsfe', l, emb)
     emb = tf.nn.relu(emb)
-
     return emb
 
+
+def linear(
+    inputs: layers.Input,
+    emb_dim,
+    seq_length, 
+    num_features       
+):
+    w_init = tf.random_normal_initializer()
+    linear_w = tf.Variable(
+        initial_value=w_init(
+            shape=(seq_length, num_features, 1, emb_dim), dtype='float32' # features, n_bins, emb_dim
+        ), trainable=True)
+    linear_b = tf.Variable(
+        w_init(
+            shape=(seq_length, num_features, 1), dtype='float32' # features, n_bins, emb_dim
+        ), trainable=True)
+    
+    embs = tf.einsum('sfne, bsf -> bsfe', linear_w, inputs)
+    embs = tf.nn.relu(embs + linear_b) 
+
+    return embs    
   
 
 def num_embedding(
@@ -100,7 +124,7 @@ def num_embedding(
 ):
 
     if emb_type not in ['linear', 'ple', 'periodic']:
-        raise ValueError("This emb_type is not supported")
+        raise ValueError(f"emb_type: {emb_type} is not supported")
     
     num_features = len(feature_names)
 
@@ -120,48 +144,29 @@ def num_embedding(
             embedding_layers[f] = emb_l
             linear_layers[f] = lin_l
 
-    elif emb_type == 'periodic':
-        # There's just 1 periodic layer
-        embedding_layer = periodic(
-            n_bins = n_bins,
-            input_shape=X.shape,
-            emb_dim = emb_dim,
-            sigma = sigma)
-    else:
-        # Initialise linear layer
-        w_init = tf.random_normal_initializer()
-        # linear_w = tf.Variable(
-        #     initial_value=w_init(
-        #         shape=(num_features, 1, emb_dim), dtype='float32' # features, n_bins, emb_dim
-        #     ), trainable=True)
-        # linear_b = tf.Variable(
-        #     w_init(
-        #         shape=(num_features, 1), dtype='float32' # features, n_bins, emb_dim
-        #     ), trainable=True)
-        linear_w = tf.Variable(
-            initial_value=w_init(
-                shape=(seq_length, num_features, 1, emb_dim), dtype='float32' # features, n_bins, emb_dim
-            ), trainable=True)
-        linear_b = tf.Variable(
-            w_init(
-                shape=(seq_length, num_features, 1), dtype='float32' # features, n_bins, emb_dim
-            ), trainable=True)
-   
-    if emb_type == 'ple':
+
         emb_columns = []
         for i, f in enumerate(feature_names):
-            # embedded_col = linear_layers[f](embedding_layers[f](inputs[:, i]))
             embedded_col = linear_layers[f](embedding_layers[f](inputs[:, :, i]))
             emb_columns.append(embedded_col)
         embs = tf.concat(emb_columns, axis=1)
-        
+
     elif emb_type == 'periodic':
-        embs = embedding_layer(inputs)
+        # There's just 1 periodic layer
+        embs = periodic(
+            inputs=inputs,
+            n_bins=n_bins,
+            seq_length=seq_length,
+            num_features=num_features,
+            emb_dim=emb_dim,
+            sigma=sigma)
     else:
-        # embs = tf.einsum('f n e, b f -> bfe', linear_w, inputs)
-        embs = tf.einsum('s f n e, b s f -> bsfe', linear_w, inputs)
-        embs = tf.nn.relu(embs + linear_b)
-        
+        embs = linear(
+            inputs=inputs,
+            seq_length=seq_length,
+            num_features=num_features,
+            emb_dim=emb_dim)     
+      
     return embs
     
 
@@ -175,7 +180,6 @@ def cat_embedding(
 
     emb_layers = {}
     for cat_name, unique_count in feature_unique_counts.items():
-
         # Create an embedding layer directly using the integer input
         emb = tf.keras.layers.Embedding(input_dim=unique_count, output_dim=emb_dim)
 
@@ -184,39 +188,11 @@ def cat_embedding(
     emb_columns = []
     for i, f in enumerate(feature_names):
         # Directly pass the integer inputs to the embedding layer
-        # embedded_col = emb_layers[f](inputs[:, i])
         embedded_col = emb_layers[f](inputs[:, :, i])
         emb_columns.append(embedded_col)
 
     embs = tf.stack(emb_columns, axis=2)
     return embs
-
-
-
-
-# def cat_embedding(
-#     inputs: layers.Input,
-#     feature_names: list,
-#     X: np.array,
-#     emb_dim: int = 32,        
-# ):
-    
-#     category_prep_layers = {}
-#     emb_layers = {}
-#     for i, c in enumerate(feature_names):
-#         lookup = tf.keras.layers.StringLookup(vocabulary=list(np.unique(X[:, i])))
-#         emb = tf.keras.layers.Embedding(input_dim=lookup.vocabulary_size(), output_dim=emb_dim)
-
-#         category_prep_layers[c] = lookup
-#         emb_layers[c] = emb
-
-#     emb_columns = []
-#     for i, f in enumerate(feature_names):
-#         embedded_col = emb_layers[f](category_prep_layers[f](inputs[:, i]))
-#         emb_columns.append(embedded_col)
-    
-#     embs = tf.stack(emb_columns, axis=1)
-#     return embs
 
 
 
