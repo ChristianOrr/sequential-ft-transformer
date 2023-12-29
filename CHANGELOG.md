@@ -2,6 +2,13 @@
 
 
 
+## v0.2.1 (2023-12-29)
+
+### Fix
+
+* fix(embedding): updated the periodic numerical embedding layer to work with sequential inputs ([`42b4d8e`](https://github.com/ChristianOrr/sequential-ft-transformer/commit/42b4d8ed85eaa0b7ec48cddac9a99f9617194111))
+
+
 ## v0.2.0 (2023-12-29)
 
 ### Chore
