@@ -7,29 +7,29 @@ import math as m
 def ple(
     inputs: layers.Input,
     n_bins, 
+    seq_length,
     data
 ):
 
     interval = 1 / n_bins
-    bins = tf.unique(
-        [
-            tf.cast(np.quantile(data, q), tf.float32)
-            for q in np.arange(0.0, 1 + interval, interval)
-        ]
-    ).y
+    intervals = np.arange(0.0, 1 + interval, interval)
+    bins = np.quantile(np.unique(data), intervals)
+    bins = tf.cast(bins, tf.float32)
+    bins = tf.unique(bins).y
 
     n_bins = len(bins)
-    init = tf.lookup.KeyValueTensorInitializer(
-        [i for i in range(n_bins)], bins
-    )
+    lookup_keys = [i for i in range(n_bins)]
+    init = tf.lookup.KeyValueTensorInitializer(lookup_keys, bins)
     lookup_table = tf.lookup.StaticHashTable(init, default_value=-1)
 
-    ple_encoding_one = tf.ones((tf.shape(inputs)[0], n_bins))
-    ple_encoding_zero = tf.zeros((tf.shape(inputs)[0], n_bins))
+    batch_size = tf.shape(inputs)[0]
 
-    left_masks = tf.TensorArray(tf.bool, size=0, dynamic_size=True)
-    right_masks = tf.TensorArray(tf.bool, size=0, dynamic_size=True)
-    other_case = tf.TensorArray(tf.float32, size=0, dynamic_size=True)
+    ple_encoding_one = tf.ones((batch_size, seq_length, n_bins))
+    ple_encoding_zero = tf.zeros((batch_size, seq_length, n_bins))
+
+    left_masks = []
+    right_masks = []
+    other_case = []
 
     for i in range(1, n_bins + 1):
         i = tf.constant(i)
@@ -38,21 +38,21 @@ def ple(
         v = (inputs - lookup_table.lookup(i - 1)) / (
             lookup_table.lookup(i) - lookup_table.lookup(i - 1)
         )
-        left_masks = left_masks.write(left_masks.size(), left_mask)
-        right_masks = right_masks.write(right_masks.size(), right_mask)
-        other_case = other_case.write(other_case.size(), v)  
+        left_masks.append(left_mask)
+        right_masks.append(right_mask)
+        other_case.append(v)
 
-    left_masks = tf.transpose(tf.squeeze(left_masks.stack()))
-    right_masks = tf.transpose(tf.squeeze(right_masks.stack()))
-    other_case = tf.transpose(tf.squeeze(other_case.stack()))
+    left_masks = tf.stack(left_masks, axis=2)
+    right_masks = tf.stack(right_masks, axis=2)
+    other_case = tf.stack(other_case, axis=2)     
 
     other_mask = right_masks == left_masks  # both are false
     other_case = tf.cast(other_case, tf.float32)
     enc = tf.where(left_masks, ple_encoding_zero, ple_encoding_one)
-    enc = tf.reshape(tf.where(other_mask, other_case, enc), (-1, 1, n_bins))
+    enc = tf.where(other_mask, other_case, enc)
+    enc = tf.reshape(enc, (-1, seq_length, 1, n_bins))
 
     return enc
-
 
 
 def periodic(
@@ -113,46 +113,27 @@ def num_embedding(
     inputs: layers.Input,
     feature_names: list,
     X: np.array,
-    y: np.array = None,
-    task: str = None,
     seq_length: int = 1,
     emb_dim: int = 32,
     emb_type: str = 'linear',
     n_bins: int = 10,
-    sigma: float = 1,
-    tree_params = {},        
+    sigma: float = 1,    
 ):
-
-    if emb_type not in ['linear', 'ple', 'periodic']:
-        raise ValueError(f"emb_type: {emb_type} is not supported")
-    
     num_features = len(feature_names)
 
     # Initialise embedding layers
     if emb_type == 'ple':
-        embedding_layers = {}
-        linear_layers = {}
-        for i, f in enumerate(feature_names):
-
-            if y is None:
-                emb_l = ple(n_bins, X[:, i])
-            else:
-                emb_l = ple(n_bins, X[:, i].reshape(-1, 1))
-
-            lin_l = tf.keras.layers.Dense(emb_dim, activation='relu')
-            
-            embedding_layers[f] = emb_l
-            linear_layers[f] = lin_l
-
-
         emb_columns = []
         for i, f in enumerate(feature_names):
-            embedded_col = linear_layers[f](embedding_layers[f](inputs[:, :, i]))
+            emb_l = ple(inputs[:, :, i], n_bins, seq_length, X[:, i])
+            lin_l = tf.keras.layers.Dense(emb_dim, activation='relu')
+            
+            embedded_col = lin_l(emb_l)
             emb_columns.append(embedded_col)
-        embs = tf.concat(emb_columns, axis=1)
+
+        embs = tf.concat(emb_columns, axis=2)
 
     elif emb_type == 'periodic':
-        # There's just 1 periodic layer
         embs = periodic(
             inputs=inputs,
             n_bins=n_bins,
@@ -160,12 +141,14 @@ def num_embedding(
             num_features=num_features,
             emb_dim=emb_dim,
             sigma=sigma)
-    else:
+    elif emb_type == 'linear':
         embs = linear(
             inputs=inputs,
             seq_length=seq_length,
             num_features=num_features,
-            emb_dim=emb_dim)     
+            emb_dim=emb_dim)  
+    else:
+        raise ValueError(f"emb_type: {emb_type} is not supported")  
       
     return embs
     

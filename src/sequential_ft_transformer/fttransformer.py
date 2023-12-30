@@ -23,7 +23,6 @@ def ft_transformer_encoder(
     numerical_features: list,
     numerical_data: np.array,
     feature_unique_counts: list,
-    task: str = None,
     seq_length: int = 1,
     embedding_dim: int = 32,
     depth: int = 4,
@@ -32,7 +31,6 @@ def ft_transformer_encoder(
     ff_dropout: float = 0.1,
     numerical_embedding_type: str = 'linear',
     numerical_bins: int = 10,
-    ple_tree_params: dict = {},
     explainable=False,       
 ):
     # Define the layers
@@ -66,13 +64,10 @@ def ft_transformer_encoder(
             inputs=numeric_inputs,
             feature_names=numerical_features, 
             X=numerical_data, 
-            y=None,
-            task=task,
             seq_length=seq_length,
             emb_dim=embedding_dim, 
             emb_type=numerical_embedding_type, 
             n_bins=numerical_bins,
-            tree_params=ple_tree_params
         )
 
         transformer_inputs += [num_embs]
