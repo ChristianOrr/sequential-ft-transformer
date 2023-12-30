@@ -2,6 +2,13 @@
 
 
 
+## v0.2.2 (2023-12-30)
+
+### Fix
+
+* fix(ple): updated piecewise linear embedding layer to work with sequential input data ([`e89504e`](https://github.com/ChristianOrr/sequential-ft-transformer/commit/e89504e3188032128eb1c3d88b993cb8b3c199e7))
+
+
 ## v0.2.1 (2023-12-29)
 
 ### Fix
