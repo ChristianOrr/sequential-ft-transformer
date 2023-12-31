@@ -80,9 +80,9 @@ jobs:
       - name: Check if package version was incremented
         id: check_version_increment
         run: |
-          prev_version=$(git describe --abbrev=0 --tags HEAD^2)  # Get previous version from 2 commits back
+          prev_version=$(git describe --abbrev=0 --tags HEAD~2)  # Get previous version from 2 commits back
           current_version=$(poetry version -s)  # Get current version from pyproject.toml
-          if [[ "$prev_version" == "$current_version" ]]; then
+          if [[ "v$prev_version" == "$current_version" ]]; then
             echo "::set-output name=version_incremented::false"
           else
             echo "::set-output name=version_incremented::true"
