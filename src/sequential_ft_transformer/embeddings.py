@@ -6,16 +6,9 @@ import math as m
 
 def ple(
     inputs: layers.Input,
-    n_bins, 
-    seq_length,
-    data
+    bins: tf.TensorArray, 
+    seq_length: int,
 ):
-
-    interval = 1 / n_bins
-    intervals = np.arange(0.0, 1 + interval, interval)
-    bins = np.quantile(np.unique(data), intervals)
-    bins = tf.cast(bins, tf.float32)
-    bins = tf.unique(bins).y
 
     n_bins = len(bins)
     lookup_keys = [i for i in range(n_bins)]
@@ -55,13 +48,38 @@ def ple(
     return enc
 
 
+def ple_layer(
+    inputs: layers.Input,
+    feature_names: list,
+    bins_dict: dict, 
+    seq_length: int,   
+    emb_dim: int     
+):
+
+    emb_columns = []
+    for i, f in enumerate(feature_names):
+        
+        bins = tf.cast(bins_dict[f], tf.float32)
+        bins = tf.unique(bins).y
+
+        emb_l = ple(inputs[:, :, i], bins, seq_length)
+        lin_l = tf.keras.layers.Dense(emb_dim, activation='relu')
+        
+        embedded_col = lin_l(emb_l)
+        emb_columns.append(embedded_col)
+
+    embs = tf.concat(emb_columns, axis=2)
+
+    return embs
+
+
 def periodic(
     inputs: layers.Input,
-    emb_dim,
-    seq_length, 
-    num_features,
-    n_bins=50, 
-    sigma=5,
+    emb_dim: int,
+    seq_length: int, 
+    num_features: int,
+    n_bins: int, 
+    sigma: float,
 ):
     # Create the state of the layer (weights)
     w_init = tf.random_normal_initializer(stddev=sigma)
@@ -89,9 +107,9 @@ def periodic(
 
 def linear(
     inputs: layers.Input,
-    emb_dim,
-    seq_length, 
-    num_features       
+    emb_dim: int,
+    seq_length: int, 
+    num_features: int       
 ):
     w_init = tf.random_normal_initializer()
     linear_w = tf.Variable(
@@ -112,28 +130,29 @@ def linear(
 def num_embedding(
     inputs: layers.Input,
     feature_names: list,
-    X: np.array,
-    seq_length: int = 1,
-    emb_dim: int = 32,
+    seq_length: int,
+    emb_dim: int,
     emb_type: str = 'linear',
-    n_bins: int = 10,
+    bins_dict: dict = None,
+    n_bins: int = None,
     sigma: float = 1,    
 ):
     num_features = len(feature_names)
 
-    # Initialise embedding layers
     if emb_type == 'ple':
-        emb_columns = []
-        for i, f in enumerate(feature_names):
-            emb_l = ple(inputs[:, :, i], n_bins, seq_length, X[:, i])
-            lin_l = tf.keras.layers.Dense(emb_dim, activation='relu')
-            
-            embedded_col = lin_l(emb_l)
-            emb_columns.append(embedded_col)
-
-        embs = tf.concat(emb_columns, axis=2)
+        if bins_dict is None:
+            raise ValueError(f"bins_dict is required for ple numerical embedding, received: {bins_dict}")
+        embs = ple_layer(
+            inputs=inputs,
+            feature_names=feature_names,
+            bins_dict=bins_dict, 
+            seq_length=seq_length,   
+            emb_dim=emb_dim    
+        )
 
     elif emb_type == 'periodic':
+        if n_bins is None:
+            raise ValueError(f"n_bins is required for periodic numerical embedding, received: {n_bins}")
         embs = periodic(
             inputs=inputs,
             n_bins=n_bins,
@@ -141,12 +160,14 @@ def num_embedding(
             num_features=num_features,
             emb_dim=emb_dim,
             sigma=sigma)
+        
     elif emb_type == 'linear':
         embs = linear(
             inputs=inputs,
             seq_length=seq_length,
             num_features=num_features,
-            emb_dim=emb_dim)  
+            emb_dim=emb_dim) 
+         
     else:
         raise ValueError(f"emb_type: {emb_type} is not supported")  
       
@@ -158,19 +179,15 @@ def cat_embedding(
     inputs: layers.Input,
     feature_names: list,
     feature_unique_counts: dict,
-    emb_dim: int = 32,
+    emb_dim: int,
 ):
-
     emb_layers = {}
     for cat_name, unique_count in feature_unique_counts.items():
-        # Create an embedding layer directly using the integer input
         emb = tf.keras.layers.Embedding(input_dim=unique_count, output_dim=emb_dim)
-
         emb_layers[cat_name] = emb
 
     emb_columns = []
     for i, f in enumerate(feature_names):
-        # Directly pass the integer inputs to the embedding layer
         embedded_col = emb_layers[f](inputs[:, :, i])
         emb_columns.append(embedded_col)
 

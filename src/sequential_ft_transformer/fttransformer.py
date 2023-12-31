@@ -21,7 +21,6 @@ def ft_transformer_encoder(
     cat_inputs: layers.Input,
     categorical_features: list,
     numerical_features: list,
-    numerical_data: np.array,
     feature_unique_counts: list,
     seq_length: int = 1,
     embedding_dim: int = 32,
@@ -30,25 +29,23 @@ def ft_transformer_encoder(
     attn_dropout: float = 0.1,
     ff_dropout: float = 0.1,
     numerical_embedding_type: str = 'linear',
-    numerical_bins: int = 10,
-    explainable=False,       
+    bins_dict: dict = None,
+    n_bins: int = None,
+    explainable: bool = False,       
 ):
-    # Define the layers
-    # CLS token
+    
     w_init = tf.random_normal_initializer()
     if numeric_inputs is not None:
         batch_size = tf.shape(numeric_inputs)[0]
     elif cat_inputs is not None:
         batch_size = tf.shape(cat_inputs)[0]
     else:
-        raise ValueError("Numeric and Categorical inputs are None.")
+        raise ValueError("Numeric and Categorical inputs are None. Need at least one.")
 
     shape = tf.stack([batch_size, seq_length, 1, embedding_dim], axis=0)
     cls_weights = w_init(shape)
     transformer_inputs = [cls_weights]
 
-
-    # If categorical features, add to list
     if categorical_features is not None and cat_inputs is not None:
         cat_embs = cat_embedding(
             inputs=cat_inputs,
@@ -58,21 +55,19 @@ def ft_transformer_encoder(
         )
         transformer_inputs += [cat_embs]
     
-    # If numerical features, add to list
     if numerical_features is not None and numeric_inputs is not None:
         num_embs = num_embedding(
             inputs=numeric_inputs,
             feature_names=numerical_features, 
-            X=numerical_data, 
             seq_length=seq_length,
             emb_dim=embedding_dim, 
             emb_type=numerical_embedding_type, 
-            n_bins=numerical_bins,
+            bins_dict=bins_dict, 
+            n_bins=n_bins,
         )
 
         transformer_inputs += [num_embs]
-    
-    # Prepare for Transformer
+
     transformer_inputs = tf.concat(transformer_inputs, axis=2)
     importances = []
 
@@ -105,7 +100,6 @@ def ft_transformer_encoder(
             )
 
     if explainable:
-        # Sum across the layers
         importances = tf.reduce_sum(tf.stack(importances), axis=0) / (
             depth * heads
         )
@@ -119,7 +113,6 @@ def ft_transformer_encoder(
 def ft_transformer(
     out_dim: int,
     out_activation: str,
-    numerical_data: np.array,
     feature_unique_counts: list,
     categorical_features: list = None,
     numerical_features: list = None,
@@ -129,8 +122,10 @@ def ft_transformer(
     heads: int = 8,
     attn_dropout: float = 0.1,
     ff_dropout: float = 0.1,
-    numerical_embedding_type: str = None,
-    explainable=False,      
+    numerical_embedding_type: str = 'linear',
+    bins_dict: dict = None,
+    n_bins: int = None,
+    explainable: bool = False,      
 ):
     # mlp layers
     ln = tf.keras.layers.LayerNormalization()
@@ -166,7 +161,6 @@ def ft_transformer(
         cat_inputs=cat_inputs,
         categorical_features=categorical_features,
         numerical_features=numerical_features,
-        numerical_data=numerical_data,
         feature_unique_counts=feature_unique_counts,
         seq_length=seq_length,
         embedding_dim=embedding_dim,
@@ -175,6 +169,8 @@ def ft_transformer(
         attn_dropout=attn_dropout,
         ff_dropout=ff_dropout,
         numerical_embedding_type=numerical_embedding_type,
+        bins_dict=bins_dict,
+        n_bins=n_bins,
         explainable=explainable,
     )
 
