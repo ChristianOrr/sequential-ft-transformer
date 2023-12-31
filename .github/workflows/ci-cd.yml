@@ -82,14 +82,18 @@ jobs:
         run: |
           prev_version=$(git describe --abbrev=0 --tags HEAD~2)  # Get previous version from 2 commits back
           current_version=$(poetry version -s)  # Get current version from pyproject.toml
+          current_version=v$current_version # Add v so that the name format matches
           echo "prev_version: $prev_version"
           echo "current_version: $current_version"
-          versions_eq=$("v$prev_version" == "$current_version")
-          echo "prev_version==current_version: $versions_eq"
-          if [[ $versions_eq ]]; then
+          if [[ "$prev_version" == "$current_version" ]]; then
+            echo "Versions are equal"
             echo "version_incremented=false" >> $GITHUB_OUTPUT
+            echo "Package version was not incremented. No new release will be published."
+            exit 0
           else
+            echo "Versions are not equal"
             echo "version_incremented=true" >> $GITHUB_OUTPUT
+            echo "Package version was incremented. A new package release will be published."
           fi
 
       - name: Exit pipeline if version wasn't incremented
