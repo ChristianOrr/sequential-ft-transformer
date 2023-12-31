@@ -69,13 +69,30 @@ jobs:
         run: |
             git config user.name github-actions
             git config user.email github-actions@github.com        
-            semantic-release --verbose version
+            semantic-release --verbose version         
 
       - name: Install package
         run: poetry install
 
       - name: Build package
         run: poetry build
+
+      - name: Check if package version was incremented
+        id: check_version_increment
+        run: |
+          prev_version=$(git describe --abbrev=0 --tags HEAD^2)  # Get previous version from 2 commits back
+          current_version=$(poetry version -s)  # Get current version from pyproject.toml
+          if [[ "$prev_version" == "$current_version" ]]; then
+            echo "::set-output name=version_incremented::false"
+          else
+            echo "::set-output name=version_incremented::true"
+          fi
+
+      - name: Exit pipeline if version wasn't incremented
+        if: steps.check_version_increment.outputs.version_incremented == 'false'
+        run: |
+          echo "Package version was not incremented. Exiting pipeline."
+          exit 0   
 
       - name: Use Python Semantic Release to prepare release
         env:
