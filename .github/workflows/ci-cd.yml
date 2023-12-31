@@ -88,23 +88,10 @@ jobs:
           if [[ "$prev_version" == "$current_version" ]]; then
             echo "Versions are equal"
             echo "version_incremented=false" >> $GITHUB_OUTPUT
-            echo "Package version was not incremented. No new release will be published."
-            exit 0
+            echo "Package version was not incremented. No new package release will be published."
           else
             echo "Versions are not equal"
             echo "version_incremented=true" >> $GITHUB_OUTPUT
-            echo "Package version was incremented. A new package release will be published."
-          fi
-
-      - name: Exit pipeline if version wasn't incremented
-        env:
-          VERSION_INCREMENTED: ${{ steps.check_version_increment.outputs.version_incremented }}
-        run: |
-          echo "VERSION_INCREMENTED: $VERSION_INCREMENTED"
-          if $VERSION_INCREMENTED == "false"; then
-            echo "Package version was not incremented. No new release will be published."
-            exit 1
-          else
             echo "Package version was incremented. A new package release will be published."
           fi
 
