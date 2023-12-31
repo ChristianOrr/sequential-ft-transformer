@@ -83,16 +83,21 @@ jobs:
           prev_version=$(git describe --abbrev=0 --tags HEAD~2)  # Get previous version from 2 commits back
           current_version=$(poetry version -s)  # Get current version from pyproject.toml
           if [[ "v$prev_version" == "$current_version" ]]; then
-            echo "::set-output name=version_incremented::false"
+            echo "version_incremented=false" >> $GITHUB_OUTPUT
           else
-            echo "::set-output name=version_incremented::true"
+            echo "version_incremented=true" >> $GITHUB_OUTPUT
           fi
 
       - name: Exit pipeline if version wasn't incremented
-        if: steps.check_version_increment.outputs.version_incremented == 'false'
+        env:
+          VERSION_INCREMENTED: ${{ steps.check_version_increment.outputs.version_incremented }}
         run: |
-          echo "Package version was not incremented. Exiting pipeline."
-          exit 0   
+          if $VERSION_INCREMENTED == "false"; then
+            echo "Package version was not incremented. No new release will be published."
+            exit 0  
+          else
+            echo "Package version was incremented. A new package release will be published."
+          fi
 
       - name: Use Python Semantic Release to prepare release
         env:
