@@ -82,7 +82,11 @@ jobs:
         run: |
           prev_version=$(git describe --abbrev=0 --tags HEAD~2)  # Get previous version from 2 commits back
           current_version=$(poetry version -s)  # Get current version from pyproject.toml
-          if [[ "v$prev_version" == "$current_version" ]]; then
+          echo "prev_version: $prev_version"
+          echo "current_version: $current_version"
+          versions_eq=$("v$prev_version" == "$current_version")
+          echo "prev_version==current_version: $versions_eq"
+          if [[ $versions_eq ]]; then
             echo "version_incremented=false" >> $GITHUB_OUTPUT
           else
             echo "version_incremented=true" >> $GITHUB_OUTPUT
@@ -92,14 +96,16 @@ jobs:
         env:
           VERSION_INCREMENTED: ${{ steps.check_version_increment.outputs.version_incremented }}
         run: |
+          echo "VERSION_INCREMENTED: $VERSION_INCREMENTED"
           if $VERSION_INCREMENTED == "false"; then
             echo "Package version was not incremented. No new release will be published."
-            exit 0  
+            exit 1
           else
             echo "Package version was incremented. A new package release will be published."
           fi
 
       - name: Use Python Semantic Release to prepare release
+        if: steps.check_version_increment.outputs.version_incremented == 'true'
         env:
           # This token is created automatically by GH Actions
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -109,6 +115,7 @@ jobs:
             poetry run semantic-release --verbose publish
 
       - name: Publish to TestPyPI
+        if: steps.check_version_increment.outputs.version_incremented == 'true'
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           user: __token__
@@ -116,6 +123,7 @@ jobs:
           repository-url: https://test.pypi.org/legacy/
 
       - name: Test install from TestPyPI
+        if: steps.check_version_increment.outputs.version_incremented == 'true'
         run: |
             pip install \
             --index-url https://test.pypi.org/simple/ \
@@ -123,6 +131,7 @@ jobs:
             sequential_ft_transformer
 
       - name: Publish to PyPI
+        if: steps.check_version_increment.outputs.version_incremented == 'true'
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           user: __token__
