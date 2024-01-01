@@ -6,6 +6,7 @@ import math as m
 
 def ple(
     inputs: layers.Input,
+    batch_size: int,
     bins: tf.TensorArray, 
     seq_length: int,
 ):
@@ -14,8 +15,6 @@ def ple(
     lookup_keys = [i for i in range(n_bins)]
     init = tf.lookup.KeyValueTensorInitializer(lookup_keys, bins)
     lookup_table = tf.lookup.StaticHashTable(init, default_value=-1)
-
-    batch_size = tf.shape(inputs)[0]
 
     ple_encoding_one = tf.ones((batch_size, seq_length, n_bins))
     ple_encoding_zero = tf.zeros((batch_size, seq_length, n_bins))
@@ -50,6 +49,7 @@ def ple(
 
 def ple_layer(
     inputs: layers.Input,
+    batch_size: int,
     feature_names: list,
     bins_dict: dict, 
     seq_length: int,   
@@ -62,7 +62,7 @@ def ple_layer(
         bins = tf.cast(bins_dict[f], tf.float32)
         bins = tf.unique(bins).y
 
-        emb_l = ple(inputs[:, :, i], bins, seq_length)
+        emb_l = ple(inputs[:, :, i], batch_size, bins, seq_length)
         lin_l = tf.keras.layers.Dense(emb_dim, activation='relu')
         
         embedded_col = lin_l(emb_l)
@@ -132,6 +132,7 @@ def num_embedding(
     feature_names: list,
     seq_length: int,
     emb_dim: int,
+    batch_size: int = None,
     emb_type: str = 'linear',
     bins_dict: dict = None,
     n_bins: int = None,
@@ -142,8 +143,11 @@ def num_embedding(
     if emb_type == 'ple':
         if bins_dict is None:
             raise ValueError(f"bins_dict is required for ple numerical embedding, received: {bins_dict}")
+        if batch_size is None:
+            raise ValueError(f"batch_size is required for ple numerical embedding, received: {batch_size}")
         embs = ple_layer(
             inputs=inputs,
+            batch_size=batch_size,
             feature_names=feature_names,
             bins_dict=bins_dict, 
             seq_length=seq_length,   

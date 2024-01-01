@@ -58,6 +58,7 @@ def ft_transformer_encoder(
     if numerical_features is not None and numeric_inputs is not None:
         num_embs = num_embedding(
             inputs=numeric_inputs,
+            batch_size=batch_size,
             feature_names=numerical_features, 
             seq_length=seq_length,
             emb_dim=embedding_dim, 
