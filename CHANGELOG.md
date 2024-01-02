@@ -2,6 +2,37 @@
 
 
 
+## v0.2.3 (2024-01-02)
+
+### Build
+
+* build(pipeline): removed the exit pipeline step since it didn&#39;t work ([`679cf86`](https://github.com/ChristianOrr/sequential-ft-transformer/commit/679cf867a0b645c7e69a4b727ef07ce9ab0a69e7))
+
+* build(pipeline): updated if statement for package version check ([`83d1e72`](https://github.com/ChristianOrr/sequential-ft-transformer/commit/83d1e72d7dff20ebd3e24b953b7ffa982350846e))
+
+* build(pipeline): added debugging info to version increment check ([`db40595`](https://github.com/ChristianOrr/sequential-ft-transformer/commit/db4059533ae7194e21ec0786757902d651570f1b))
+
+* build(pipeline): updated setting package version incremented output paramater ([`4a435da`](https://github.com/ChristianOrr/sequential-ft-transformer/commit/4a435da69527bcadee018edd9f143135ddfb1291))
+
+* build(pipeline): updated package version incremented check ([`53e2e78`](https://github.com/ChristianOrr/sequential-ft-transformer/commit/53e2e78a664c6b34732f8afea1290db574d37202))
+
+* build(pipeline): added check to see if package version was incremented and exit early if it wasn&#39;t ([`736f421`](https://github.com/ChristianOrr/sequential-ft-transformer/commit/736f42110706246809b0e28b1727b0c9f31f4707))
+
+### Documentation
+
+* docs(ple): added ple target-aware embeddings ([`4b385f8`](https://github.com/ChristianOrr/sequential-ft-transformer/commit/4b385f89aed4988a95aa114157a088ffa50f1b68))
+
+### Fix
+
+* fix(docs): added docstring and updated notebooks to demo latest code ([`020800c`](https://github.com/ChristianOrr/sequential-ft-transformer/commit/020800c7cd03d935d6f08cc207b5bbce545c295c))
+
+### Refactor
+
+* refactor(code): removed old ft-transformer code ([`069dac0`](https://github.com/ChristianOrr/sequential-ft-transformer/commit/069dac051e85ca8d46ca560b73fc554e081ce7cc))
+
+* refactor(ple): moved ple bins calculations out of the model, its now passed as an argument ([`558cfb6`](https://github.com/ChristianOrr/sequential-ft-transformer/commit/558cfb6ce98578723becd0d0545743ed0b736cf3))
+
+
 ## v0.2.2 (2023-12-30)
 
 ### Fix
