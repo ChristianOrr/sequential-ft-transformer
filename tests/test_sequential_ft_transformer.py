@@ -1,7 +1,9 @@
 from sequential_ft_transformer import (
     fttransformer,
     embeddings,
-    transformer
+    transformer,
+    plotting,
+    preprocessing
 )
 
 def test_dummy():
