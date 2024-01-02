@@ -20,6 +20,22 @@ def transformer_block(
     explainable: bool = False,
     post_norm: bool = True,        
 ):
+    """
+    Creates a single transformer block for use in Transformer-based models.
+
+    Args:
+        inputs: The input tensor for the block.
+        embed_dim: The embedding dimension for the block.
+        num_heads: The number of attention heads in the MultiHeadAttention layer.
+        ff_dim: The hidden dimension of the feedforward network.
+        att_dropout: The dropout rate for attention layers.
+        ff_dropout: The dropout rate for feedforward layers.
+        explainable: Whether to enable explainability by returning attention weights.
+        post_norm: Whether to use the post-norm variant of the transformer block (default: True).
+
+    Returns:
+        Either a single tensor (the transformer block's output) or a tuple of two tensors (output and attention weights) if explainable is True.
+    """
     # Define the layers
     att = MultiHeadAttention(
         num_heads=num_heads, key_dim=embed_dim, dropout=att_dropout

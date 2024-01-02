@@ -9,7 +9,7 @@ from tensorflow.keras.layers import (
 from sequential_ft_transformer.transformer import transformer_block
 from sequential_ft_transformer.embeddings import (
     cat_embedding,
-    num_embedding,
+    numeric_embedding,
 )
 
 
@@ -20,17 +20,44 @@ def ft_transformer_encoder(
     numerical_features: list,
     feature_unique_counts: list,
     seq_length: int = 1,
-    embedding_dim: int = 32,
+    embedding_dim: int = 16,
     depth: int = 4,
     heads: int = 8,
-    attn_dropout: float = 0.1,
-    ff_dropout: float = 0.1,
+    attn_dropout: float = 0.2,
+    ff_dropout: float = 0.2,
     numerical_embedding_type: str = 'linear',
     bins_dict: dict = None,
     n_bins: int = None,
     explainable: bool = False,       
 ):
-    
+    """
+    Creates the encoder component of a Feature Transformer (FT) Transformer model.
+
+    Args:
+        numeric_inputs: A TensorFlow tensor of shape (batch_size, seq_length, num_numeric_features)
+        representing numerical features.
+        cat_inputs: A TensorFlow tensor of shape (batch_size, seq_length, num_categorical_features)
+        representing categorical features.
+        categorical_features: A list of names for categorical features.
+        numerical_features: A list of names for numerical features.
+        feature_unique_counts: A dictionary mapping feature names to their number of unique values.
+        seq_length: The length of the input sequence. (set to 1 if the data is non-sequential)
+        embedding_dim: The embedding dimension for both categorical and numerical features.
+        depth: The number of transformer blocks in the encoder.
+        heads: The number of attention heads in each transformer block.
+        attn_dropout: The dropout rate for attention layers.
+        ff_dropout: The dropout rate for feedforward layers.
+        numerical_embedding_type: The type of embedding to use for numerical features
+        (one of 'linear', 'ple', or 'periodic').
+        bins_dict: A dictionary mapping numerical feature names to their bin boundaries (required for 'ple').
+        n_bins: The number of bins for periodic encoding (required for 'periodic').
+        explainable: Whether to enable model explainability by capturing attention weights.
+
+    Returns:
+        A tuple of two tensors:
+        - The encoded output tensor of shape (batch_size, seq_length, 1, embedding_dim).
+        - A tensor of attention importance scores (if explainable is True) of shape (num_features).
+    """    
     w_init = tf.random_normal_initializer()
     if numeric_inputs is not None:
         batch_size = tf.shape(numeric_inputs)[0]
@@ -53,7 +80,7 @@ def ft_transformer_encoder(
         transformer_inputs += [cat_embs]
     
     if numerical_features is not None and numeric_inputs is not None:
-        num_embs = num_embedding(
+        num_embs = numeric_embedding(
             inputs=numeric_inputs,
             batch_size=batch_size,
             feature_names=numerical_features, 
@@ -72,7 +99,7 @@ def ft_transformer_encoder(
     # Pass through Transformer blocks
     for _ in range(depth):
         if explainable:
-            transformer_inputs, att_weights = transformer_block(
+            transformer_output, att_weights = transformer_block(
                 transformer_inputs,
                 embedding_dim,
                 heads,
@@ -86,7 +113,7 @@ def ft_transformer_encoder(
             att = tf.reduce_sum(att, axis=(1, 2, 3))
             importances.append(att)
         else:
-            transformer_inputs = transformer_block(
+            transformer_output = transformer_block(
                 transformer_inputs,
                 embedding_dim,
                 heads,
@@ -101,9 +128,9 @@ def ft_transformer_encoder(
         importances = tf.reduce_sum(tf.stack(importances), axis=0) / (
             depth * heads
         )
-        return transformer_inputs, importances
+        return transformer_output, importances
     else:
-        return transformer_inputs, None
+        return transformer_output, None
         
 
 
@@ -125,6 +152,40 @@ def ft_transformer(
     n_bins: int = None,
     explainable: bool = False,      
 ):
+    """
+    Creates a sequential Feature Tokenizer Transformer (FT-Transformer) model.
+    This model supports sequential numerical and/or categorical data as well as 
+    non-sequential data when seq_length = 1. 
+
+    Args:
+        out_dim: The output dimension of the model.
+        out_activation: The activation function to use for the output layer.
+        feature_unique_counts: A dictionary mapping feature names to their number of unique values.
+        categorical_features: A list of names for categorical features (optional).
+        numerical_features: A list of names for numerical features (optional).
+        seq_length: The length of the input sequence.
+        embedding_dim: The embedding dimension for both categorical and numerical features.
+        depth: The number of transformer blocks in the encoder.
+        heads: The number of attention heads in each transformer block.
+        attn_dropout: The dropout rate for attention layers.
+        ff_dropout: The dropout rate for feedforward layers.
+        numerical_embedding_type: The type of embedding to use for numerical features
+        (one of 'linear', 'ple', or 'periodic').
+        bins_dict: A dictionary mapping numerical feature names to their bin boundaries (required for 'ple').
+        n_bins: The number of bins for periodic encoding (required for 'periodic').
+        explainable: Whether to enable model explainability by capturing attention weights.
+
+    Returns:
+        A TensorFlow Keras model with the following input and output layers:
+
+        Input layers:
+        - "numeric_inputs" (if numerical features are provided)
+        - "cat_inputs" (if categorical features are provided)
+
+        Output layers:
+        - "output": The main model output of shape (batch_size, out_dim).
+        - "importances" (if explainable is True): A tensor of attention importance scores of shape (num_features).
+    """
     
     ln = LayerNormalization()
     flatten = Flatten()

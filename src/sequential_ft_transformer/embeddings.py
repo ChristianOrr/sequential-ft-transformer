@@ -10,7 +10,18 @@ def ple(
     bins: tf.TensorArray, 
     seq_length: int,
 ):
+    """
+    Creates piecewise linear encoding (PLE) for numerical features.
 
+    Args:
+        inputs: A TensorFlow tensor of shape (batch_size, seq_length, 1) representing a numerical feature.
+        batch_size: The batch size.
+        bins: A TensorFlow tensor representing the bin boundaries for the feature.
+        seq_length: The length of the input sequence.
+
+    Returns:
+        A TensorFlow tensor of shape (batch_size, seq_length, 1, n_bins) containing the PLE encoding.
+    """
     n_bins = len(bins)
     lookup_keys = [i for i in range(n_bins)]
     init = tf.lookup.KeyValueTensorInitializer(lookup_keys, bins)
@@ -55,6 +66,20 @@ def ple_layer(
     seq_length: int,   
     emb_dim: int     
 ):
+    """
+    Creates a layer that applies PLE to multiple numerical features.
+
+    Args:
+        inputs: A TensorFlow tensor of shape (batch_size, seq_length, num_features) representing numerical features.
+        batch_size: The batch size.
+        feature_names: A list of feature names.
+        bins_dict: A dictionary mapping feature names to their bin boundaries.
+        seq_length: The length of the input sequence.
+        emb_dim: The embedding dimension.
+
+    Returns:
+        A TensorFlow tensor of shape (batch_size, seq_length, num_features, emb_dim) containing the embedded features.
+    """
 
     emb_columns = []
     for i, f in enumerate(feature_names):
@@ -81,7 +106,20 @@ def periodic(
     n_bins: int, 
     sigma: float,
 ):
-    # Create the state of the layer (weights)
+    """
+    Creates periodic encoding for numerical features.
+
+    Args:
+        inputs: A TensorFlow tensor of shape (batch_size, seq_length, num_features) representing numerical features.
+        emb_dim: The embedding dimension.
+        seq_length: The length of the input sequence.
+        num_features: The number of features.
+        n_bins: The number of bins for the periodic encoding.
+        sigma: The standard deviation for weight initialization.
+
+    Returns:
+        A TensorFlow tensor of shape (batch_size, seq_length, num_features, emb_dim) containing the embedded features.
+    """
     w_init = tf.random_normal_initializer(stddev=sigma)
     p_shape = (seq_length, num_features, n_bins)
     p = tf.Variable(
@@ -97,7 +135,6 @@ def periodic(
             dtype='float32' 
             ), trainable=True)
 
-    # Defines the computation from inputs to outputs
     v = 2 * m.pi * p[None] * inputs[..., None]
     emb = tf.concat([tf.math.sin(v), tf.math.cos(v)], axis=-1)
     emb = tf.einsum('sfne, bsfn -> bsfe', l, emb)
@@ -111,6 +148,18 @@ def linear(
     seq_length: int, 
     num_features: int       
 ):
+    """
+    Creates a linear embedding for numerical features.
+
+    Args:
+        inputs: A TensorFlow tensor of shape (batch_size, seq_length, num_features) representing numerical features.
+        emb_dim: The embedding dimension.
+        seq_length: The length of the input sequence.
+        num_features: The number of features.
+
+    Returns:
+        A TensorFlow tensor of shape (batch_size, seq_length, num_features, emb_dim) containing the embedded features.
+    """
     w_init = tf.random_normal_initializer()
     linear_w = tf.Variable(
         initial_value=w_init(
@@ -127,7 +176,7 @@ def linear(
     return embs    
   
 
-def num_embedding(
+def numeric_embedding(
     inputs: layers.Input,
     feature_names: list,
     seq_length: int,
@@ -138,6 +187,23 @@ def num_embedding(
     n_bins: int = None,
     sigma: float = 1,    
 ):
+    """
+    Creates numerical embeddings using the specified embedding type.
+
+    Args:
+        inputs: A TensorFlow tensor of shape (batch_size, seq_length, num_features) representing numerical features.
+        feature_names: A list of feature names.
+        seq_length: The length of the input sequence.
+        emb_dim: The embedding dimension.
+        batch_size: The batch size (optional, required for PLE).
+        emb_type: The type of numerical embedding to use ('linear', 'ple', or 'periodic').
+        bins_dict: A dictionary mapping feature names to their bin boundaries (required for PLE).
+        n_bins: The number of bins for periodic encoding (required for periodic encoding).
+        sigma: The standard deviation for weight initialization (used for periodic encoding).
+
+    Returns:
+        A TensorFlow tensor of shape (batch_size, seq_length, num_features, emb_dim) containing the embedded features.
+    """
     num_features = len(feature_names)
 
     if emb_type == 'ple':
@@ -184,6 +250,18 @@ def cat_embedding(
     feature_unique_counts: dict,
     emb_dim: int,
 ):
+    """
+    Creates categorical embeddings for a set of categorical features.
+
+    Args:
+        inputs: A TensorFlow tensor of shape (batch_size, seq_length, num_features) representing categorical features.
+        feature_names: A list of feature names.
+        feature_unique_counts: A dictionary mapping feature names to their number of unique values.
+        emb_dim: The embedding dimension.
+
+    Returns:
+        A TensorFlow tensor of shape (batch_size, seq_length, num_features, emb_dim) containing the embedded features.
+    """
     emb_layers = {}
     for cat_name, unique_count in feature_unique_counts.items():
         emb = tf.keras.layers.Embedding(input_dim=unique_count, output_dim=emb_dim)

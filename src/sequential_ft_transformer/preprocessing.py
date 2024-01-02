@@ -5,36 +5,42 @@ import pandas as pd
 import tensorflow as tf
 
 
-def pad_df(df, seq_length, seq_col_name):
-  """Pads a dataframe so that all sequences have the same length.
+def pad_df(
+    df: pd.DataFrame, 
+    seq_length: int, 
+    seq_col_name: str
+):
+    """
+    Pads a DataFrame with sequential data to a specified sequence length.
 
-  Args:
-    df: A pandas dataframe with an 'id' column.
-    seq_length: The desired length of each sequence.
+    Args:
+        df: The DataFrame to pad.
+        seq_length: The desired sequence length.
+        seq_col_name: The name of the column representing the sequence ID.
 
-  Returns:
-    A padded dataframe where all sequences have the same length.
-  """
-  grouped_df = df.groupby(seq_col_name)
+    Returns:
+        The padded DataFrame.
+    """
+    grouped_df = df.groupby(seq_col_name)
 
-  def g(df):
-    num_df_rows = len(df)
-    df = df.reset_index(drop=True)
+    def g(df):
+        num_df_rows = len(df)
+        df = df.reset_index(drop=True)
 
-    if num_df_rows > seq_length:
-      # first rows
-      # df = df[:seq_length]
-      # last rows
-      df = df[-seq_length:]
-    elif num_df_rows < seq_length:
-      num_padded_rows = seq_length - num_df_rows
-      padded_rows = pd.DataFrame([df.iloc[-1]] * num_padded_rows)
-      df = pd.concat([df, padded_rows], ignore_index=True)
+        if num_df_rows > seq_length:
+            # first rows
+            # df = df[:seq_length]
+            # last rows
+            df = df[-seq_length:]
+        elif num_df_rows < seq_length:
+            num_padded_rows = seq_length - num_df_rows
+            padded_rows = pd.DataFrame([df.iloc[-1]] * num_padded_rows)
+            df = pd.concat([df, padded_rows], ignore_index=True)
 
-    return df
+        return df
 
-  padded_df = grouped_df.apply(g)
-  return padded_df.reset_index(drop=True)
+    padded_df = grouped_df.apply(g)
+    return padded_df.reset_index(drop=True)
 
 
 def sq_df_to_dataset(
@@ -48,6 +54,25 @@ def sq_df_to_dataset(
     shuffle: bool = True,
     batch_size: int = 512,
 ):
+    """
+    Converts a DataFrame with sequential data to a TensorFlow dataset.
+    Designed for the sequential FT-Transformer.
+
+    Args:
+        input_df: The input DataFrame.
+        seq_length: The sequence length.
+        seq_col_name: The name of the column representing the sequence ID (optional, for sequences > 1).
+        target_df: The target DataFrame (optional).
+        target: The target column name (optional).
+        categorical_features: A list of categorical feature names (optional).
+        numerical_features: A list of numerical feature names (optional).
+        shuffle: Whether to shuffle the dataset (default: True).
+        batch_size: The batch size for the dataset (default: 512).
+
+    Returns:
+        A TensorFlow dataset.
+    """    
+
     input_df = input_df.copy()
     dataset = {}
 
@@ -94,49 +119,19 @@ def sq_df_to_dataset(
     return dataset
 
 
-def df_to_dataset(
-    dataframe: pd.DataFrame,  
-    target: str = None,
-    categorical_features: list = None,
-    numerical_features: list = None,  
-    shuffle: bool = True,
-    batch_size: int = 512,
+def download_data(
+    url: str, 
+    data_folder: str, 
+    filename: str
 ):
-    df = dataframe.copy()
-    dataset = {}
-
-    empty_cat: bool = categorical_features is None
-    empty_numeric: bool = numerical_features is None
-
-    if empty_cat and empty_numeric:
-        raise ValueError("Both categorical and numerical features are missing. At least one is needed")
-    if not empty_cat:
-        dataset["cat_inputs"] = df[categorical_features].to_numpy()
-    if not empty_numeric:
-        dataset["numeric_inputs"] = df[numerical_features].to_numpy()
-
-
-    if target:
-        labels = df.pop(target)
-        dataset = tf.data.Dataset.from_tensor_slices((dict(dataset), labels))
-    else:
-        dataset = tf.data.Dataset.from_tensor_slices(dict(dataset))
-
-    if shuffle:
-        dataset = dataset.shuffle(buffer_size=len(dataframe))
-    dataset = dataset.batch(batch_size)
-    dataset = dataset.prefetch(batch_size)
-    return dataset
-
-
-def download_data(url, data_folder, filename):
-    """Downloads a file from a URL and saves it to a specified folder.
+    """
+    Downloads a file from a URL to a specified folder.
 
     Args:
-        url (str): The URL of the file to download.
-        data_folder (str): The path to the folder where the file should be saved.
-        filename (str): The name to use for the downloaded file.
-    """
+        url: The URL of the file to download.
+        data_folder: The folder to download the file to.
+        filename: The name to save the file as.
+    """    
 
     filepath = os.path.join(data_folder, filename)
 
