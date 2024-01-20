@@ -99,7 +99,7 @@ def ft_transformer_encoder(
     # Pass through Transformer blocks
     for _ in range(depth):
         if explainable:
-            transformer_output, att_weights = transformer_block(
+            transformer_inputs, att_weights = transformer_block(
                 transformer_inputs,
                 embedding_dim,
                 heads,
@@ -113,7 +113,7 @@ def ft_transformer_encoder(
             att = tf.reduce_sum(att, axis=(1, 2, 3))
             importances.append(att)
         else:
-            transformer_output = transformer_block(
+            transformer_inputs = transformer_block(
                 transformer_inputs,
                 embedding_dim,
                 heads,
@@ -128,9 +128,9 @@ def ft_transformer_encoder(
         importances = tf.reduce_sum(tf.stack(importances), axis=0) / (
             depth * heads
         )
-        return transformer_output, importances
+        return transformer_inputs, importances
     else:
-        return transformer_output, None
+        return transformer_inputs, None
         
 
 
@@ -187,7 +187,7 @@ def ft_transformer(
         - "importances" (if explainable is True): A tensor of attention importance scores of shape (num_features).
     """
     
-    ln = LayerNormalization()
+    ln = LayerNormalization(epsilon=1e-6)
     flatten = Flatten()
     dense_dim_size = embedding_dim * seq_length
     dense1 = Dense(dense_dim_size//2, activation='relu')
@@ -231,8 +231,8 @@ def ft_transformer(
         bins_dict=bins_dict,
         n_bins=n_bins,
         explainable=explainable,
-    )
-
+    )  
+     
     layer_norm_cls = ln(x[:, :, 0, :])
     layer_norm_cls = flatten(layer_norm_cls)
     layer_norm_cls = dense1(layer_norm_cls)
