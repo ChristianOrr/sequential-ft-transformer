@@ -2,6 +2,13 @@
 
 
 
+## v0.2.4 (2024-01-20)
+
+### Fix
+
+* fix(transoformer): fixed layernorm crashing on gpu without epsilon argument and fix transformer wasnt going passed depth level 1 ([`779c576`](https://github.com/ChristianOrr/sequential-ft-transformer/commit/779c5768a87818a6b83d7a40d41b23fd9ab4fefd))
+
+
 ## v0.2.3 (2024-01-02)
 
 ### Build
