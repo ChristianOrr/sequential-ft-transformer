@@ -174,7 +174,69 @@ def linear(
     embs = tf.nn.relu(embs + linear_b) 
 
     return embs    
-  
+
+
+class PeriodicEmbedding(tf.keras.layers.Layer):
+    def __init__(self, emb_dim, seq_length, num_features, n_bins, sigma):
+        super().__init__()
+        self.emb_dim = emb_dim
+        self.seq_length = seq_length
+        self.num_features = num_features
+        self.n_bins = n_bins
+        self.sigma = sigma
+
+        self.p = None
+        self.l = None
+
+    def build(self, input_shape):
+        w_init = tf.random_normal_initializer(stddev=self.sigma)
+        self.p = self.add_weight(
+            shape=(self.seq_length, self.num_features, self.n_bins),
+            initializer=w_init,
+            trainable=True,
+            name='p'
+        )
+        self.l = self.add_weight(
+            shape=(self.seq_length, self.num_features, self.n_bins * 2, self.emb_dim),
+            initializer=w_init,
+            trainable=True,
+            name='l'
+        )
+
+    def call(self, inputs):
+        v = 2 * np.pi * self.p[None] * inputs[..., None]  # Use NumPy for pi
+        emb = tf.concat([tf.math.sin(v), tf.math.cos(v)], axis=-1)
+        emb = tf.einsum('sfne, bsfn -> bsfe', self.l, emb)
+        emb = tf.nn.relu(emb)
+        return emb
+
+
+class LinearEmbedding(tf.keras.layers.Layer):
+    def __init__(self, emb_dim, seq_length, num_features):
+        super().__init__()
+        self.emb_dim = emb_dim
+        self.seq_length = seq_length
+        self.num_features = num_features
+
+    def build(self, input_shape):
+        self.linear_w = self.add_weight(
+            shape=(self.seq_length, self.num_features, 1, self.emb_dim),
+            initializer='random_normal',
+            trainable=True,
+            name='linear_w'
+        )
+        self.linear_b = self.add_weight(
+            shape=(self.seq_length, self.num_features, 1),
+            initializer='random_normal',
+            trainable=True,
+            name='linear_b'
+        )
+
+    def call(self, inputs):
+        embs = tf.einsum('sfne, bsf -> bsfe', self.linear_w, inputs)
+        embs = tf.nn.relu(embs + self.linear_b)
+        return embs
+
 
 def numeric_embedding(
     inputs: layers.Input,
@@ -223,20 +285,10 @@ def numeric_embedding(
     elif emb_type == 'periodic':
         if n_bins is None:
             raise ValueError(f"n_bins is required for periodic numerical embedding, received: {n_bins}")
-        embs = periodic(
-            inputs=inputs,
-            n_bins=n_bins,
-            seq_length=seq_length,
-            num_features=num_features,
-            emb_dim=emb_dim,
-            sigma=sigma)
+        embs = PeriodicEmbedding(emb_dim, seq_length, num_features, n_bins, sigma)(inputs)
         
     elif emb_type == 'linear':
-        embs = linear(
-            inputs=inputs,
-            seq_length=seq_length,
-            num_features=num_features,
-            emb_dim=emb_dim) 
+        embs = LinearEmbedding(emb_dim, seq_length, num_features)(inputs)
          
     else:
         raise ValueError(f"emb_type: {emb_type} is not supported")  
