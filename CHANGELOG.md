@@ -2,6 +2,13 @@
 
 
 
+## v0.2.5 (2024-02-04)
+
+### Fix
+
+* fix(embeddings): Converted linear and periodic embedding layers to keras subclassed layers to prevent serialization errors when saving ([`6cc101c`](https://github.com/ChristianOrr/sequential-ft-transformer/commit/6cc101c3a6102fd04b126f96fc62467354f0a0ca))
+
+
 ## v0.2.4 (2024-01-20)
 
 ### Fix
