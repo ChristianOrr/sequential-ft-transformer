@@ -43,21 +43,40 @@ If you are proposing a feature:
 Ready to contribute? Here's how to set up `sequential_ft_transformer` for local development.
 
 1. Download a copy of `sequential_ft_transformer` locally.
-2. Install `sequential_ft_transformer` using `poetry`:
+2. Install pipx.
+  
+  - For Ubuntu 23.04 or above:
+      ```console
+      $ sudo apt update
+      $ sudo apt install pipx
+      $ pipx ensurepath
+      ```  
+  
+  - For Ubuntu 22.04 or below:
+      ```console
+      $ python3 -m pip install --user pipx
+      $ python3 -m pipx ensurepath
+      ```
+
+3. Install the poetry package: 
+    ```console
+    $ pipx install poetry
+    ```
+4. Install `sequential_ft_transformer` using `poetry`:
 
     ```console
     $ poetry install
     ```
 
-3. Use `git` (or similar) to create a branch for local development and make your changes:
+5. Use `git` (or similar) to create a branch for local development and make your changes:
 
     ```console
     $ git checkout -b name-of-your-bugfix-or-feature
     ```
 
-4. When you're done making changes, check that your changes conform to any code formatting requirements and pass any tests.
+6. When you're done making changes, check that your changes conform to any code formatting requirements and pass any tests.
 
-5. Commit your changes and open a pull request.
+7. Commit your changes and open a pull request.
 
 ## Pull Request Guidelines
 
