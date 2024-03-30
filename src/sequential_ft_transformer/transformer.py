@@ -1,7 +1,7 @@
-import tensorflow as tf
-from tensorflow.keras.activations import gelu
+import keras
+from keras.activations import gelu
 from keras import layers
-from tensorflow.keras.layers import (
+from keras.layers import (
     Add,
     Dense,
     Dropout,
@@ -42,17 +42,16 @@ def transformer_block(
     )
     skip1 = Add()
     layernorm1 = LayerNormalization(epsilon=1e-6)
-    ffn = tf.keras.Sequential(
+    ffn = keras.Sequential(
         [
             Dense(ff_dim, activation=gelu),
             Dropout(ff_dropout),
-            Dense(embed_dim),
+            Dense(embed_dim)
         ]
     )
     layernorm2 = LayerNormalization(epsilon=1e-6)
     skip2 = Add()    
     
-
     # Post-norm variant
     if post_norm:
         inputs = layernorm1(inputs)
@@ -75,7 +74,6 @@ def transformer_block(
             )
         else:
             attention_output = att(norm_input, norm_input)
-
         attention_output = skip1([inputs, attention_output])
         norm_attention_output = layernorm2(attention_output)
         feedforward_output = ffn(norm_attention_output)

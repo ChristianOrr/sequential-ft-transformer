@@ -1,16 +1,39 @@
-import tensorflow as tf
+import keras
 from keras import layers
-from tensorflow.keras.layers import (
+from keras.layers import (
     Dense,
     Flatten,
-    LayerNormalization
+    LayerNormalization,
 )
-
 from sequential_ft_transformer.transformer import transformer_block
 from sequential_ft_transformer.embeddings import (
     cat_embedding,
     numeric_embedding,
 )
+
+
+class CLSWeightsLayer(keras.layers.Layer):
+  def __init__(self, seq_length, embedding_dim, **kwargs):
+    super().__init__(**kwargs)
+    self.seq_length = seq_length
+    self.embedding_dim = embedding_dim
+
+  def build(self, input_shape):
+    # Initial shape with single dimension for batch size
+    self.cls_weights = self.add_weight(
+        shape=[1, self.seq_length, 1, self.embedding_dim],
+        initializer="random_normal",
+        trainable=True
+    )
+
+  def call(self, inputs):
+    batch_size = keras.ops.shape(inputs)[0]
+    # Repeat the cls_weights to match the batch_size
+    cls_weights_tiled = keras.ops.tile(self.cls_weights, batch_size)
+    cls_weights = keras.ops.reshape(cls_weights_tiled, (batch_size, self.seq_length, 1, self.embedding_dim))
+    return cls_weights
+
+
 
 
 def ft_transformer_encoder(
@@ -58,16 +81,14 @@ def ft_transformer_encoder(
         - The encoded output tensor of shape (batch_size, seq_length, 1, embedding_dim).
         - A tensor of attention importance scores (if explainable is True) of shape (num_features).
     """    
-    w_init = tf.random_normal_initializer()
+    
     if numeric_inputs is not None:
-        batch_size = tf.shape(numeric_inputs)[0]
+        cls_weights = CLSWeightsLayer(seq_length, embedding_dim)(numeric_inputs)
     elif cat_inputs is not None:
-        batch_size = tf.shape(cat_inputs)[0]
+        cls_weights = CLSWeightsLayer(seq_length, embedding_dim)(cat_inputs)
     else:
         raise ValueError("Numeric and Categorical inputs are None. Need at least one.")
 
-    shape = tf.stack([batch_size, seq_length, 1, embedding_dim], axis=0)
-    cls_weights = w_init(shape)
     transformer_inputs = [cls_weights]
 
     if categorical_features is not None and cat_inputs is not None:
@@ -82,7 +103,6 @@ def ft_transformer_encoder(
     if numerical_features is not None and numeric_inputs is not None:
         num_embs = numeric_embedding(
             inputs=numeric_inputs,
-            batch_size=batch_size,
             feature_names=numerical_features, 
             seq_length=seq_length,
             emb_dim=embedding_dim, 
@@ -93,7 +113,7 @@ def ft_transformer_encoder(
 
         transformer_inputs += [num_embs]
 
-    transformer_inputs = tf.concat(transformer_inputs, axis=2)
+    transformer_inputs = keras.ops.concatenate(transformer_inputs, axis=2)
     importances = []
 
     # Pass through Transformer blocks
@@ -110,14 +130,14 @@ def ft_transformer_encoder(
                 post_norm=False,  # FT-Transformer uses pre-norm
             )
             att = att_weights[:, :, :, 0, :, :]
-            att = tf.reduce_sum(att, axis=(1, 2, 3))
+            att = keras.ops.sum(att, axis=(1, 2, 3))
             importances.append(att)
         else:
             transformer_inputs = transformer_block(
                 transformer_inputs,
                 embedding_dim,
                 heads,
-                embedding_dim,
+                embedding_dim * 2,
                 att_dropout=attn_dropout,
                 ff_dropout=ff_dropout,
                 explainable=explainable,
@@ -125,7 +145,7 @@ def ft_transformer_encoder(
             )
 
     if explainable:
-        importances = tf.reduce_sum(tf.stack(importances), axis=0) / (
+        importances = keras.ops.sum(keras.ops.stack(importances), axis=0) / (
             depth * heads
         )
         return transformer_inputs, importances
@@ -243,7 +263,7 @@ def ft_transformer(
     if explainable:
         outputs_dict.update({"importances": expl})
 
-    model = tf.keras.Model(inputs=inputs_dict,
+    model = keras.Model(inputs=inputs_dict,
                            outputs=outputs_dict,
                            name="FT-Transformer")
 
