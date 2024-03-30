@@ -2,6 +2,23 @@
 
 
 
+## v0.3.0 (2024-03-30)
+
+### Documentation
+
+* docs(contributing): added additional install instructions for contributing docs ([`a40d30c`](https://github.com/ChristianOrr/sequential-ft-transformer/commit/a40d30c8409fff573b6e02148181f1eeec176928))
+
+### Feature
+
+* feat(package): updated the package to support keras 3 ([`f14d978`](https://github.com/ChristianOrr/sequential-ft-transformer/commit/f14d978f3a5a3019f1680c1cb64419c7a2875657))
+
+### Refactor
+
+* refactor(dependencies): added jax as backend ([`f4f18d6`](https://github.com/ChristianOrr/sequential-ft-transformer/commit/f4f18d6e08b4c62666a25d967ead7afb24cce4b6))
+
+* refactor(ci-cd): refactored the ci-cd pipeline to look at the previous 1 commit instead of 2 to get the prev version ([`6a9bbac`](https://github.com/ChristianOrr/sequential-ft-transformer/commit/6a9bbac9898c256d7f8af467c723884f8ea6b063))
+
+
 ## v0.2.5 (2024-02-04)
 
 ### Fix

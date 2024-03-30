@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "sequential_ft_transformer"
-version = "0.2.5"
+version = "0.3.0"
 description = "FT Transformer applied to sequential tabular data"
 authors = ["Christian Orr"]
 license = "MIT"
