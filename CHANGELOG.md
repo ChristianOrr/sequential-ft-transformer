@@ -2,6 +2,13 @@
 
 
 
+## v0.3.1 (2024-03-31)
+
+### Fix
+
+* fix(keras): converted all layers to keras subclassed layers and the model to a subclassed model for keras 3 integration ([`085a3a6`](https://github.com/ChristianOrr/sequential-ft-transformer/commit/085a3a607d64bcb43e0f6c8898ca8cc8bcd64457))
+
+
 ## v0.3.0 (2024-03-30)
 
 ### Documentation
