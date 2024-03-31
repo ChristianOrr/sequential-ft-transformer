@@ -57,50 +57,44 @@ class PLEFeatureLayer(keras.layers.Layer):
         return enc
 
 
-def ple(
-    inputs: layers.Input,
-    feature_names: list,
-    bins_dict: dict, 
-    seq_length: int,   
-    emb_dim: int,
-    dtype: str = "float32"    
-):
-    """
-    Creates a layer that applies PLE to multiple numerical features.
+class PLELayer(keras.layers.Layer):
+    def __init__(self, feature_names, bins_dict, seq_length, emb_dim, dtype="float32", **kwargs):
+        super().__init__(**kwargs)
+        self.feature_names = feature_names
+        self.bins_dict = bins_dict
+        self.seq_length = seq_length
+        self.emb_dim = emb_dim
+        self.type = dtype
 
-    Args:
-        inputs: A TensorFlow tensor of shape (batch_size, seq_length, num_features) representing numerical features.
-        batch_size: The batch size.
-        feature_names: A list of feature names.
-        bins_dict: A dictionary mapping feature names to their bin boundaries.
-        seq_length: The length of the input sequence.
-        emb_dim: The embedding dimension.
+        self.ple_layers = {}
+        self.dense_layers = {}
+        # Build PLEFeatureLayer instances for each feature during model building
+        for feature_name in self.feature_names:
+            # We need to use Tensorflow here since there is no unique operation in keras 3
+            bins = tf.unique(self.bins_dict[feature_name]).y
+            bins = keras.ops.cast(bins, self.type)
+            self.ple_layers[feature_name] = PLEFeatureLayer(bins=bins, seq_length=self.seq_length, dtype=self.type)
+            self.dense_layers[feature_name] = keras.layers.Dense(self.emb_dim, activation="relu")        
 
-    Returns:
-        A TensorFlow tensor of shape (batch_size, seq_length, num_features, emb_dim) containing the embedded features.
-    """
+    def call(self, inputs):
+        embedded_features = []
+        for i, feature_name in enumerate(self.feature_names):
+            # Use pre-built PLEFeatureLayer for each feature
+            ple_layer = self.ple_layers[feature_name]
+            ple_encoding = ple_layer(inputs[:, :, i])  
 
-    emb_columns = []
-    for i, f in enumerate(feature_names):
-        
-        # We need to use Tensorflow here since there is no unique operation in keras 3
-        bins = tf.unique(bins_dict[f]).y
-        bins = keras.ops.cast(bins, dtype)
-        
-        ple_feature_layer = PLEFeatureLayer(bins=bins, seq_length=seq_length, dtype=dtype)
-        emb_l = ple_feature_layer(inputs[:, :, i])
-        lin_l = keras.layers.Dense(emb_dim, activation='relu')
-        
-        embedded_col = lin_l(emb_l)
-        emb_columns.append(embedded_col)
+            # Add dense layer for final embedding
+            dense_layer = self.dense_layers[feature_name]
+            embedded_feature = dense_layer(ple_encoding)
+            embedded_features.append(embedded_feature)
 
-    embs = keras.ops.concatenate(emb_columns, axis=2)
-
-    return embs 
+        # Concatenate embedded features along the feature dimension
+        embedded_features = keras.ops.concatenate(embedded_features, axis=2)
+        return embedded_features
 
 
 class PeriodicEmbedding(keras.layers.Layer):
-    def __init__(self, emb_dim, seq_length, num_features, n_bins, sigma):
+    def __init__(self, emb_dim, seq_length, num_features, n_bins, sigma, **kwargs):
         super().__init__()
         self.emb_dim = emb_dim
         self.seq_length = seq_length
@@ -135,7 +129,7 @@ class PeriodicEmbedding(keras.layers.Layer):
 
 
 class LinearEmbedding(keras.layers.Layer):
-    def __init__(self, emb_dim, seq_length, num_features):
+    def __init__(self, emb_dim, seq_length, num_features, **kwargs):
         super().__init__()
         self.emb_dim = emb_dim
         self.seq_length = seq_length
@@ -161,87 +155,74 @@ class LinearEmbedding(keras.layers.Layer):
         return embs
 
 
-def numeric_embedding(
-    inputs: layers.Input,
-    feature_names: list,
-    seq_length: int,
-    emb_dim: int,
-    emb_type: str = 'linear',
-    bins_dict: dict = None,
-    n_bins: int = None,
-    sigma: float = 1,    
-):
-    """
-    Creates numerical embeddings using the specified embedding type.
+class NumericEmbeddingLayer(keras.layers.Layer):
+    def __init__(self, feature_names, seq_length, emb_dim, emb_type="linear", bins_dict=None, n_bins=None, sigma=1.0, **kwargs):
+        super().__init__(**kwargs)
+        self.feature_names = feature_names
+        self.seq_length = seq_length
+        self.emb_dim = emb_dim
+        self.emb_type = emb_type
+        self.bins_dict = bins_dict
+        self.n_bins = n_bins
+        self.sigma = sigma
 
-    Args:
-        inputs: A TensorFlow tensor of shape (batch_size, seq_length, num_features) representing numerical features.
-        feature_names: A list of feature names.
-        seq_length: The length of the input sequence.
-        emb_dim: The embedding dimension.
-        batch_size: The batch size (optional, required for PLE).
-        emb_type: The type of numerical embedding to use ('linear', 'ple', or 'periodic').
-        bins_dict: A dictionary mapping feature names to their bin boundaries (required for PLE).
-        n_bins: The number of bins for periodic encoding (required for periodic encoding).
-        sigma: The standard deviation for weight initialization (used for periodic encoding).
+        # Internal layers (optional depending on emb_type)
+        self.periodic_layer = None
+        self.linear_layer = None
 
-    Returns:
-        A TensorFlow tensor of shape (batch_size, seq_length, num_features, emb_dim) containing the embedded features.
-    """
-    num_features = len(feature_names)
+        # Validate arguments based on emb_type
+        if self.emb_type == "ple":
+            if self.bins_dict is None:
+                raise ValueError("bins_dict is required for PLE embedding.")
+        elif self.emb_type == "periodic":
+            if self.n_bins is None:
+                raise ValueError("n_bins is required for periodic embedding.")
+            self.periodic_layer = PeriodicEmbedding(
+                self.emb_dim, self.seq_length, len(self.feature_names), self.n_bins, self.sigma
+            )
+        elif self.emb_type == "linear":
+            self.linear_layer = LinearEmbedding(self.emb_dim, self.seq_length, len(self.feature_names))
+        else:
+            raise ValueError(f"emb_type: {self.emb_type} is not supported.")
 
-    if emb_type == 'ple':
-        if bins_dict is None:
-            raise ValueError(f"bins_dict is required for ple numerical embedding, received: {bins_dict}")
-        embs = ple(
-            inputs=inputs,
-            feature_names=feature_names,
-            bins_dict=bins_dict, 
-            seq_length=seq_length,   
-            emb_dim=emb_dim    
-        )
+    def call(self, inputs):
+        if self.emb_type == "ple":
+            # The PLE Layer needs to be in the call, 
+            # since the batch size is used from inputs
+            ple_layer = PLELayer(
+                feature_names=self.feature_names,
+                bins_dict=self.bins_dict,
+                seq_length=self.seq_length,
+                emb_dim=self.emb_dim,
+                dtype="float32",
+            )
+            embeddings = ple_layer(inputs)
+        elif self.emb_type == "periodic":
+            embeddings = self.periodic_layer(inputs)
+        else:
+            embeddings = self.linear_layer(inputs)
 
-    elif emb_type == 'periodic':
-        if n_bins is None:
-            raise ValueError(f"n_bins is required for periodic numerical embedding, received: {n_bins}")
-        embs = PeriodicEmbedding(emb_dim, seq_length, num_features, n_bins, sigma)(inputs)
-        
-    elif emb_type == 'linear':
-        embs = LinearEmbedding(emb_dim, seq_length, num_features)(inputs)
-         
-    else:
-        raise ValueError(f"emb_type: {emb_type} is not supported")  
-      
-    return embs
-    
+        return embeddings
 
-def cat_embedding(
-    inputs: layers.Input,
-    feature_names: list,
-    feature_unique_counts: dict,
-    emb_dim: int,
-):
-    """
-    Creates categorical embeddings for a set of categorical features.
 
-    Args:
-        inputs: A TensorFlow tensor of shape (batch_size, seq_length, num_features) representing categorical features.
-        feature_names: A list of feature names.
-        feature_unique_counts: A dictionary mapping feature names to their number of unique values.
-        emb_dim: The embedding dimension.
+class CatEmbeddingLayer(keras.layers.Layer):
+    def __init__(self, feature_unique_counts, emb_dim, **kwargs):
+        super().__init__(**kwargs)
+        self.feature_unique_counts = feature_unique_counts
+        self.emb_dim = emb_dim
 
-    Returns:
-        A TensorFlow tensor of shape (batch_size, seq_length, num_features, emb_dim) containing the embedded features.
-    """
-    emb_layers = {}
-    for cat_name, unique_count in feature_unique_counts.items():
-        emb = keras.layers.Embedding(input_dim=unique_count, output_dim=emb_dim)
-        emb_layers[cat_name] = emb
+        self.emb_layers = {}
+        # Build embedding layers
+        for feature_name, unique_count in self.feature_unique_counts.items():
+            emb = keras.layers.Embedding(input_dim=unique_count, output_dim=self.emb_dim)
+            self.emb_layers[feature_name] = emb
 
-    emb_columns = []
-    for i, f in enumerate(feature_names):
-        embedded_col = emb_layers[f](inputs[:, :, i])
-        emb_columns.append(embedded_col)
+    def call(self, inputs):
+        # Embed each categorical feature using corresponding layer
+        emb_columns = []
+        for i, f in enumerate(self.feature_unique_counts.keys()):
+            embedded_feature = self.emb_layers[f](inputs[:, :, i])
+            emb_columns.append(embedded_feature)
 
-    embs = keras.ops.stack(emb_columns, axis=2)
-    return embs
+        embs = keras.ops.stack(emb_columns, axis=2)
+        return embs

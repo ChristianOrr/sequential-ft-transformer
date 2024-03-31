@@ -1,6 +1,4 @@
 import keras
-from keras.activations import gelu
-from keras import layers
 from keras.layers import (
     Add,
     Dense,
@@ -10,76 +8,44 @@ from keras.layers import (
 )
 
 
-def transformer_block(
-    inputs: layers.Input,
-    embed_dim: int,
-    num_heads: int,
-    ff_dim: int,
-    att_dropout: float = 0.1,
-    ff_dropout: float = 0.1,
-    explainable: bool = False,
-    post_norm: bool = True,        
-):
-    """
-    Creates a single transformer block for use in Transformer-based models.
+class TransformerBlock(keras.layers.Layer):
+    def __init__(self, embed_dim, num_heads, ff_dim, attn_dropout=0.1, ff_dropout=0.1, explainable=False, post_norm=True, **kwargs):
+        super().__init__(**kwargs)
+        self.embed_dim = embed_dim
+        self.num_heads = num_heads
+        self.ff_dim = ff_dim
+        self.attn_dropout = attn_dropout
+        self.ff_dropout = ff_dropout
+        self.explainable = explainable
+        self.post_norm = post_norm
 
-    Args:
-        inputs: The input tensor for the block.
-        embed_dim: The embedding dimension for the block.
-        num_heads: The number of attention heads in the MultiHeadAttention layer.
-        ff_dim: The hidden dimension of the feedforward network.
-        att_dropout: The dropout rate for attention layers.
-        ff_dropout: The dropout rate for feedforward layers.
-        explainable: Whether to enable explainability by returning attention weights.
-        post_norm: Whether to use the post-norm variant of the transformer block (default: True).
+        # Layers within the block
+        self.att = MultiHeadAttention(num_heads=num_heads, key_dim=embed_dim, dropout=attn_dropout)
+        self.skip1 = Add()
+        self.layernorm1 = LayerNormalization(epsilon=1e-6)
+        self.ffn = keras.Sequential(
+            [Dense(ff_dim, activation="gelu"), Dropout(ff_dropout), Dense(embed_dim)]
+        )
+        self.layernorm2 = LayerNormalization(epsilon=1e-6)
+        self.skip2 = Add()
 
-    Returns:
-        Either a single tensor (the transformer block's output) or a tuple of two tensors (output and attention weights) if explainable is True.
-    """
-    # Define the layers
-    att = MultiHeadAttention(
-        num_heads=num_heads, key_dim=embed_dim, dropout=att_dropout
-    )
-    skip1 = Add()
-    layernorm1 = LayerNormalization(epsilon=1e-6)
-    ffn = keras.Sequential(
-        [
-            Dense(ff_dim, activation=gelu),
-            Dropout(ff_dropout),
-            Dense(embed_dim)
-        ]
-    )
-    layernorm2 = LayerNormalization(epsilon=1e-6)
-    skip2 = Add()    
-    
-    # Post-norm variant
-    if post_norm:
-        inputs = layernorm1(inputs)
-        if explainable:
-            attention_output, att_weights = att(
-                inputs, inputs, return_attention_scores=True
-            )
+    def call(self, inputs):
+        if self.post_norm:
+            normalized_inputs = self.layernorm1(inputs)
+            attention_output = self.att(normalized_inputs, normalized_inputs)
+            attention_output = self.skip1([inputs, attention_output])
+            ff_output = self.ffn(attention_output)
+            output = self.skip2([ff_output, attention_output])
+            output = self.layernorm2(output)
         else:
-            attention_output = att(inputs, inputs)
-        attention_output = skip1([inputs, attention_output])   
-        feedforward_output = ffn(attention_output) 
-        transformer_output = skip2([feedforward_output, attention_output])
-        transformer_output = layernorm2(transformer_output)
-    # Pre-norm variant
-    else:
-        norm_input = layernorm1(inputs)
-        if explainable:
-            attention_output, att_weights = att(
-                norm_input, norm_input, return_attention_scores=True
-            )
+            normalized_inputs = self.layernorm1(inputs)
+            attention_output = self.att(normalized_inputs, normalized_inputs)
+            attention_output = self.skip1([inputs, attention_output])
+            normalized_att_output = self.layernorm2(attention_output)
+            ff_output = self.ffn(normalized_att_output)
+            output = self.skip2([ff_output, attention_output])
+
+        if self.explainable:
+            return output, self.att.attention_weights  # Access attention weights from MultiHeadAttention
         else:
-            attention_output = att(norm_input, norm_input)
-        attention_output = skip1([inputs, attention_output])
-        norm_attention_output = layernorm2(attention_output)
-        feedforward_output = ffn(norm_attention_output)
-        transformer_output = skip2([feedforward_output, attention_output])
-    
-    if explainable:
-        return transformer_output, att_weights
-    else:
-        return transformer_output
+            return output

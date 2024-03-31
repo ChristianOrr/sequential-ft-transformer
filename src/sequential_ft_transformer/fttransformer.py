@@ -1,15 +1,10 @@
 import keras
-from keras import layers
-from keras.layers import (
-    Dense,
-    Flatten,
-    LayerNormalization,
-)
-from sequential_ft_transformer.transformer import transformer_block
+from sequential_ft_transformer.transformer import TransformerBlock
 from sequential_ft_transformer.embeddings import (
-    cat_embedding,
-    numeric_embedding,
+    CatEmbeddingLayer,
+    NumericEmbeddingLayer,
 )
+from typing import List  
 
 
 class CLSWeightsLayer(keras.layers.Layer):
@@ -34,238 +29,158 @@ class CLSWeightsLayer(keras.layers.Layer):
     return cls_weights
 
 
+class FTTransformerEncoder(keras.layers.Layer):
+    def __init__(self,
+                 categorical_features,
+                 numerical_features,
+                 feature_unique_counts,
+                 seq_length=1,
+                 embedding_dim=16,
+                 depth=4,
+                 heads=8,
+                 attn_dropout=0.2,
+                 ff_dropout=0.2,
+                 numerical_embedding_type="linear",
+                 bins_dict=None,
+                 n_bins=None,
+                 explainable=False,
+                 post_norm=False,
+                 **kwargs):
+        super().__init__(**kwargs)
+        self.categorical_features = categorical_features
+        self.numerical_features = numerical_features
+        self.feature_unique_counts = feature_unique_counts
+        self.seq_length = seq_length
+        self.embedding_dim = embedding_dim
+        self.depth = depth
+        self.heads = heads
+        self.attn_dropout = attn_dropout
+        self.ff_dropout = ff_dropout
+        self.numerical_embedding_type = numerical_embedding_type
+        self.bins_dict = bins_dict
+        self.n_bins = n_bins
+        self.explainable = explainable
 
-
-def ft_transformer_encoder(
-    numeric_inputs: layers.Input,
-    cat_inputs: layers.Input,
-    categorical_features: list,
-    numerical_features: list,
-    feature_unique_counts: list,
-    seq_length: int = 1,
-    embedding_dim: int = 16,
-    depth: int = 4,
-    heads: int = 8,
-    attn_dropout: float = 0.2,
-    ff_dropout: float = 0.2,
-    numerical_embedding_type: str = 'linear',
-    bins_dict: dict = None,
-    n_bins: int = None,
-    explainable: bool = False,       
-):
-    """
-    Creates the encoder component of a Feature Transformer (FT) Transformer model.
-
-    Args:
-        numeric_inputs: A TensorFlow tensor of shape (batch_size, seq_length, num_numeric_features)
-        representing numerical features.
-        cat_inputs: A TensorFlow tensor of shape (batch_size, seq_length, num_categorical_features)
-        representing categorical features.
-        categorical_features: A list of names for categorical features.
-        numerical_features: A list of names for numerical features.
-        feature_unique_counts: A dictionary mapping feature names to their number of unique values.
-        seq_length: The length of the input sequence. (set to 1 if the data is non-sequential)
-        embedding_dim: The embedding dimension for both categorical and numerical features.
-        depth: The number of transformer blocks in the encoder.
-        heads: The number of attention heads in each transformer block.
-        attn_dropout: The dropout rate for attention layers.
-        ff_dropout: The dropout rate for feedforward layers.
-        numerical_embedding_type: The type of embedding to use for numerical features
-        (one of 'linear', 'ple', or 'periodic').
-        bins_dict: A dictionary mapping numerical feature names to their bin boundaries (required for 'ple').
-        n_bins: The number of bins for periodic encoding (required for 'periodic').
-        explainable: Whether to enable model explainability by capturing attention weights.
-
-    Returns:
-        A tuple of two tensors:
-        - The encoded output tensor of shape (batch_size, seq_length, 1, embedding_dim).
-        - A tensor of attention importance scores (if explainable is True) of shape (num_features).
-    """    
-    
-    if numeric_inputs is not None:
-        cls_weights = CLSWeightsLayer(seq_length, embedding_dim)(numeric_inputs)
-    elif cat_inputs is not None:
-        cls_weights = CLSWeightsLayer(seq_length, embedding_dim)(cat_inputs)
-    else:
-        raise ValueError("Numeric and Categorical inputs are None. Need at least one.")
-
-    transformer_inputs = [cls_weights]
-
-    if categorical_features is not None and cat_inputs is not None:
-        cat_embs = cat_embedding(
-            inputs=cat_inputs,
-            feature_names=categorical_features,
-            feature_unique_counts=feature_unique_counts,
-            emb_dim =embedding_dim
-        )
-        transformer_inputs += [cat_embs]
-    
-    if numerical_features is not None and numeric_inputs is not None:
-        num_embs = numeric_embedding(
-            inputs=numeric_inputs,
-            feature_names=numerical_features, 
-            seq_length=seq_length,
-            emb_dim=embedding_dim, 
-            emb_type=numerical_embedding_type, 
-            bins_dict=bins_dict, 
-            n_bins=n_bins,
-        )
-
-        transformer_inputs += [num_embs]
-
-    transformer_inputs = keras.ops.concatenate(transformer_inputs, axis=2)
-    importances = []
-
-    # Pass through Transformer blocks
-    for _ in range(depth):
-        if explainable:
-            transformer_inputs, att_weights = transformer_block(
-                transformer_inputs,
+        # Internal layers
+        self.cls_weights_layer = CLSWeightsLayer(seq_length, embedding_dim)
+        if categorical_features:
+            self.cat_layer = CatEmbeddingLayer(
+                feature_unique_counts=feature_unique_counts, emb_dim=embedding_dim
+            )
+        if numerical_features:
+            self.numeric_layer = NumericEmbeddingLayer(
+                feature_names=numerical_features,
+                seq_length=seq_length,
+                emb_dim=embedding_dim,
+                emb_type=numerical_embedding_type,
+                bins_dict=bins_dict,
+                n_bins=n_bins,
+            )
+        self.transformer_blocks = [
+            TransformerBlock(
                 embedding_dim,
                 heads,
                 embedding_dim,
-                att_dropout=attn_dropout,
+                attn_dropout=attn_dropout,
                 ff_dropout=ff_dropout,
                 explainable=explainable,
-                post_norm=False,  # FT-Transformer uses pre-norm
+                post_norm=post_norm,
             )
-            att = att_weights[:, :, :, 0, :, :]
-            att = keras.ops.sum(att, axis=(1, 2, 3))
-            importances.append(att)
+            for _ in range(depth)
+        ]
+
+    def call(self, inputs):
+        numeric_inputs, cat_inputs = inputs["numeric_inputs"], inputs["cat_inputs"]
+        # Process CLS weights
+        cls_weights = self.cls_weights_layer(numeric_inputs if numeric_inputs is not None else cat_inputs)
+
+        # Embedding layers
+        embeddings = [cls_weights]
+        if self.categorical_features:
+            cat_embs = self.cat_layer(cat_inputs)
+            embeddings.append(cat_embs)
+        if self.numerical_features:
+            num_embs = self.numeric_layer(numeric_inputs)
+            embeddings.append(num_embs)
+
+        # Concatenate embeddings
+        transformer_inputs = keras.ops.concatenate(embeddings, axis=2)
+        importances = []
+
+        # Pass through transformer blocks
+        for block in self.transformer_blocks:
+            if self.explainable:
+                transformer_inputs, att_weights = block(transformer_inputs)
+                att = att_weights[:, :, :, 0, :, :]
+                att = keras.ops.sum(att, axis=(1, 2, 3))
+                importances.append(att)
+            else:
+                transformer_inputs = block(transformer_inputs)
+
+        if self.explainable:
+            importances = keras.ops.sum(keras.ops.stack(importances), axis=0) / (
+                self.depth * self.heads
+            )
+            return transformer_inputs, importances
         else:
-            transformer_inputs = transformer_block(
-                transformer_inputs,
-                embedding_dim,
-                heads,
-                embedding_dim * 2,
-                att_dropout=attn_dropout,
-                ff_dropout=ff_dropout,
-                explainable=explainable,
-                post_norm=False,  # FT-Transformer uses pre-norm
-            )
+            return transformer_inputs
 
-    if explainable:
-        importances = keras.ops.sum(keras.ops.stack(importances), axis=0) / (
-            depth * heads
+   
+
+class FTTransformer(keras.Model):
+    def __init__(
+        self,
+        out_dim: int,
+        out_activation: str,
+        feature_unique_counts: dict,
+        categorical_features: List[str] = None,
+        numerical_features: List[str] = None,
+        seq_length: int = 1,
+        embedding_dim: int = 32,
+        depth: int = 4,
+        heads: int = 8,
+        attn_dropout: float = 0.1,
+        ff_dropout: float = 0.1,
+        numerical_embedding_type: str = "linear",
+        bins_dict: dict = None,
+        n_bins: int = None,
+        explainable: bool = False,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        self.out_dim = out_dim
+        self.out_activation = keras.activations.get(out_activation)  # Get activation function
+        self.ln = keras.layers.LayerNormalization(epsilon=1e-6)
+        self.flatten = keras.layers.Flatten()
+        self.dense1 = keras.layers.Dense(embedding_dim * seq_length // 2, activation="relu")
+        self.dense2 = keras.layers.Dense(embedding_dim * seq_length // 4, activation="relu")
+        self.output_layer = keras.layers.Dense(out_dim, activation=self.out_activation, name="output")
+
+        self.transformer_encoder = FTTransformerEncoder(
+            categorical_features=categorical_features,
+            numerical_features=numerical_features,
+            feature_unique_counts=feature_unique_counts,
+            seq_length=seq_length,
+            embedding_dim=embedding_dim,
+            depth=depth,
+            heads=heads,
+            attn_dropout=attn_dropout,
+            ff_dropout=ff_dropout,
+            numerical_embedding_type=numerical_embedding_type,
+            bins_dict=bins_dict,
+            n_bins=n_bins,
+            explainable=explainable,
         )
-        return transformer_inputs, importances
-    else:
-        return transformer_inputs, None
-        
 
+    def call(self, inputs):
+        x = self.transformer_encoder(inputs)
+        layer_norm_cls = self.ln(x[:, :, 0, :])
+        layer_norm_cls = self.flatten(layer_norm_cls)
+        layer_norm_cls = self.dense1(layer_norm_cls)
+        layer_norm_cls = self.dense2(layer_norm_cls)
+        output = self.output_layer(layer_norm_cls)
 
-
-def ft_transformer(
-    out_dim: int,
-    out_activation: str,
-    feature_unique_counts: list,
-    categorical_features: list = None,
-    numerical_features: list = None,
-    seq_length: int = 1,
-    embedding_dim: int = 32,
-    depth: int = 4,
-    heads: int = 8,
-    attn_dropout: float = 0.1,
-    ff_dropout: float = 0.1,
-    numerical_embedding_type: str = 'linear',
-    bins_dict: dict = None,
-    n_bins: int = None,
-    explainable: bool = False,      
-):
-    """
-    Creates a sequential Feature Tokenizer Transformer (FT-Transformer) model.
-    This model supports sequential numerical and/or categorical data as well as 
-    non-sequential data when seq_length = 1. 
-
-    Args:
-        out_dim: The output dimension of the model.
-        out_activation: The activation function to use for the output layer.
-        feature_unique_counts: A dictionary mapping feature names to their number of unique values.
-        categorical_features: A list of names for categorical features (optional).
-        numerical_features: A list of names for numerical features (optional).
-        seq_length: The length of the input sequence.
-        embedding_dim: The embedding dimension for both categorical and numerical features.
-        depth: The number of transformer blocks in the encoder.
-        heads: The number of attention heads in each transformer block.
-        attn_dropout: The dropout rate for attention layers.
-        ff_dropout: The dropout rate for feedforward layers.
-        numerical_embedding_type: The type of embedding to use for numerical features
-        (one of 'linear', 'ple', or 'periodic').
-        bins_dict: A dictionary mapping numerical feature names to their bin boundaries (required for 'ple').
-        n_bins: The number of bins for periodic encoding (required for 'periodic').
-        explainable: Whether to enable model explainability by capturing attention weights.
-
-    Returns:
-        A TensorFlow Keras model with the following input and output layers:
-
-        Input layers:
-        - "numeric_inputs" (if numerical features are provided)
-        - "cat_inputs" (if categorical features are provided)
-
-        Output layers:
-        - "output": The main model output of shape (batch_size, out_dim).
-        - "importances" (if explainable is True): A tensor of attention importance scores of shape (num_features).
-    """
-    
-    ln = LayerNormalization(epsilon=1e-6)
-    flatten = Flatten()
-    dense_dim_size = embedding_dim * seq_length
-    dense1 = Dense(dense_dim_size//2, activation='relu')
-    dense2 = Dense(dense_dim_size//4, activation='relu')
-    output_layer = Dense(out_dim, activation=out_activation, name="output")
-
-    inputs_dict = dict()
-    empty_cat: bool = categorical_features is None
-    empty_numeric: bool = numerical_features is None
-
-    if empty_cat and empty_numeric:
-        raise ValueError("Both categorical and numerical features are missing. At least one is needed")
-    
-    if not empty_numeric:
-        numeric_input_shape = (seq_length, len(numerical_features), )
-        numeric_inputs = layers.Input(shape=numeric_input_shape, name="numeric_inputs")
-        inputs_dict.update({"numeric_inputs": numeric_inputs})
-    else:
-        numeric_inputs = None
-
-    if not empty_cat:
-        cat_input_shape = (seq_length, len(categorical_features), )
-        cat_inputs = layers.Input(shape=cat_input_shape, name="cat_inputs")
-        inputs_dict.update({"cat_inputs": cat_inputs})
-    else:
-        cat_inputs = None
-
-    x, expl = ft_transformer_encoder(
-        numeric_inputs=numeric_inputs,
-        cat_inputs=cat_inputs,
-        categorical_features=categorical_features,
-        numerical_features=numerical_features,
-        feature_unique_counts=feature_unique_counts,
-        seq_length=seq_length,
-        embedding_dim=embedding_dim,
-        depth=depth,
-        heads=heads,
-        attn_dropout=attn_dropout,
-        ff_dropout=ff_dropout,
-        numerical_embedding_type=numerical_embedding_type,
-        bins_dict=bins_dict,
-        n_bins=n_bins,
-        explainable=explainable,
-    )  
-     
-    layer_norm_cls = ln(x[:, :, 0, :])
-    layer_norm_cls = flatten(layer_norm_cls)
-    layer_norm_cls = dense1(layer_norm_cls)
-    layer_norm_cls = dense2(layer_norm_cls)
-    output = output_layer(layer_norm_cls)
-
-    outputs_dict = {"output": output}
-    if explainable:
-        outputs_dict.update({"importances": expl})
-
-    model = keras.Model(inputs=inputs_dict,
-                           outputs=outputs_dict,
-                           name="FT-Transformer")
-
-    return model
-
+        if self.transformer_encoder.explainable:
+            return output, self.transformer_encoder.expl
+        else:
+            return output
