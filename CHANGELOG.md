@@ -2,6 +2,13 @@
 
 
 
+## v0.3.2 (2024-04-01)
+
+### Fix
+
+* fix(loading): added get and from config methods for all layers to ensure loading and saving the model successfully ([`5fb3cde`](https://github.com/ChristianOrr/sequential-ft-transformer/commit/5fb3cde3bbf74372633719679915908e24749fcb))
+
+
 ## v0.3.1 (2024-03-31)
 
 ### Fix
