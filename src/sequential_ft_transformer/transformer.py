@@ -8,6 +8,7 @@ from keras.layers import (
 )
 
 
+@keras.saving.register_keras_serializable(package="TransformerLayers")
 class TransformerBlock(keras.layers.Layer):
     def __init__(self, embed_dim, num_heads, ff_dim, attn_dropout=0.1, ff_dropout=0.1, explainable=False, post_norm=True, **kwargs):
         super().__init__(**kwargs)
@@ -49,3 +50,20 @@ class TransformerBlock(keras.layers.Layer):
             return output, self.att.attention_weights  # Access attention weights from MultiHeadAttention
         else:
             return output
+        
+    def get_config(self):
+        config = {
+            "embed_dim": self.embed_dim,
+            "num_heads": self.num_heads,
+            "ff_dim": self.ff_dim,
+            "attn_dropout": self.attn_dropout,
+            "ff_dropout": self.ff_dropout,
+            "explainable": self.explainable,
+            "post_norm": self.post_norm,
+        }
+        base_config = super().get_config()
+        return dict(list(base_config.items()) + list(config.items()))
+
+    @classmethod
+    def from_config(cls, config):
+        return cls(**config)

@@ -4,6 +4,7 @@ from keras import layers
 import numpy as np
 
 
+@keras.saving.register_keras_serializable(package="TransformerLayers")
 class PLEFeatureLayer(keras.layers.Layer):
     """
     Creates piecewise linear encoding (PLE) for a numerical feature.
@@ -56,7 +57,21 @@ class PLEFeatureLayer(keras.layers.Layer):
 
         return enc
 
+    def get_config(self):
+        config = {
+            "bins": self.bins,
+            "seq_length": self.seq_length,
+            "dtype": self.dtype,
+        }
+        base_config = super().get_config()
+        return dict(list(base_config.items()) + list(config.items()))
 
+    @classmethod
+    def from_config(cls, config):
+        return cls(**config)
+
+
+@keras.saving.register_keras_serializable(package="TransformerLayers")
 class PLELayer(keras.layers.Layer):
     def __init__(self, feature_names, bins_dict, seq_length, emb_dim, dtype="float32", **kwargs):
         super().__init__(**kwargs)
@@ -68,13 +83,14 @@ class PLELayer(keras.layers.Layer):
 
         self.ple_layers = {}
         self.dense_layers = {}
-        # Build PLEFeatureLayer instances for each feature during model building
+
+    def build(self, input_shape):
         for feature_name in self.feature_names:
             # We need to use Tensorflow here since there is no unique operation in keras 3
             bins = tf.unique(self.bins_dict[feature_name]).y
-            bins = keras.ops.cast(bins, self.type)
-            self.ple_layers[feature_name] = PLEFeatureLayer(bins=bins, seq_length=self.seq_length, dtype=self.type)
-            self.dense_layers[feature_name] = keras.layers.Dense(self.emb_dim, activation="relu")        
+            bins = keras.ops.cast(bins, self.dtype)
+            self.ple_layers[feature_name] = PLEFeatureLayer(bins=bins, seq_length=self.seq_length, dtype=self.dtype)
+            self.dense_layers[feature_name] = keras.layers.Dense(self.emb_dim, activation="relu") 
 
     def call(self, inputs):
         embedded_features = []
@@ -92,7 +108,23 @@ class PLELayer(keras.layers.Layer):
         embedded_features = keras.ops.concatenate(embedded_features, axis=2)
         return embedded_features
 
+    def get_config(self):
+        config = {
+            "feature_names": self.feature_names,
+            "bins_dict": self.bins_dict,  # Include for deserialization
+            "seq_length": self.seq_length,
+            "emb_dim": self.emb_dim,
+            "dtype": self.dtype,
+        }
+        base_config = super().get_config()
+        return dict(list(base_config.items()) + list(config.items()))
 
+    @classmethod
+    def from_config(cls, config):
+        return cls(**config)
+
+
+@keras.saving.register_keras_serializable(package="TransformerLayers")
 class PeriodicEmbedding(keras.layers.Layer):
     def __init__(self, emb_dim, seq_length, num_features, n_bins, sigma, **kwargs):
         super().__init__()
@@ -126,8 +158,24 @@ class PeriodicEmbedding(keras.layers.Layer):
         embs = keras.ops.einsum('sfne, bsfn -> bsfe', self.l, embs)
         embs = keras.ops.relu(embs)
         return embs
+    
+    def get_config(self):
+        config = {
+            "emb_dim": self.emb_dim,
+            "seq_length": self.seq_length,
+            "num_features": self.num_features,
+            "n_bins": self.n_bins,
+            "sigma": self.sigma,
+        }
+        base_config = super().get_config()
+        return dict(list(base_config.items()) + list(config.items()))
+
+    @classmethod
+    def from_config(cls, config):
+        return cls(**config)
 
 
+@keras.saving.register_keras_serializable(package="TransformerLayers")
 class LinearEmbedding(keras.layers.Layer):
     def __init__(self, emb_dim, seq_length, num_features, **kwargs):
         super().__init__()
@@ -154,7 +202,21 @@ class LinearEmbedding(keras.layers.Layer):
         embs = keras.ops.relu(embs + self.linear_b)
         return embs
 
+    def get_config(self):
+        config = {
+            "emb_dim": self.emb_dim,
+            "seq_length": self.seq_length,
+            "num_features": self.num_features,
+        }
+        base_config = super().get_config()
+        return dict(list(base_config.items()) + list(config.items()))
 
+    @classmethod
+    def from_config(cls, config):
+        return cls(**config)
+    
+
+@keras.saving.register_keras_serializable(package="TransformerLayers")
 class NumericEmbeddingLayer(keras.layers.Layer):
     def __init__(self, feature_names, seq_length, emb_dim, emb_type="linear", bins_dict=None, n_bins=None, sigma=1.0, **kwargs):
         super().__init__(**kwargs)
@@ -165,25 +227,29 @@ class NumericEmbeddingLayer(keras.layers.Layer):
         self.bins_dict = bins_dict
         self.n_bins = n_bins
         self.sigma = sigma
+        self.supported_layers = ["ple", "periodic", "linear"]
 
+        # Validate arguments based on emb_type
+        self._validate_arguments()
         # Internal layers (optional depending on emb_type)
         self.periodic_layer = None
         self.linear_layer = None
 
-        # Validate arguments based on emb_type
-        if self.emb_type == "ple":
-            if self.bins_dict is None:
-                raise ValueError("bins_dict is required for PLE embedding.")
-        elif self.emb_type == "periodic":
-            if self.n_bins is None:
-                raise ValueError("n_bins is required for periodic embedding.")
+    def _validate_arguments(self):
+        if self.emb_type not in self.supported_layers:
+            raise ValueError(f"emb_type: {self.emb_type} is not supported. Use one of the following layers: {self.supported_layers}")
+        if self.emb_type == "ple" and self.bins_dict is None:
+            raise ValueError("bins_dict is required for PLE embedding.")
+        elif self.emb_type == "periodic" and self.n_bins is None:
+            raise ValueError("n_bins is required for periodic embedding.")
+
+    def build(self, input_shape):
+        if self.emb_type == "periodic":
             self.periodic_layer = PeriodicEmbedding(
                 self.emb_dim, self.seq_length, len(self.feature_names), self.n_bins, self.sigma
             )
         elif self.emb_type == "linear":
             self.linear_layer = LinearEmbedding(self.emb_dim, self.seq_length, len(self.feature_names))
-        else:
-            raise ValueError(f"emb_type: {self.emb_type} is not supported.")
 
     def call(self, inputs):
         if self.emb_type == "ple":
@@ -204,7 +270,25 @@ class NumericEmbeddingLayer(keras.layers.Layer):
 
         return embeddings
 
+    def get_config(self):
+        config = {
+            "feature_names": self.feature_names,
+            "seq_length": self.seq_length,
+            "emb_dim": self.emb_dim,
+            "emb_type": self.emb_type,
+            "bins_dict": self.bins_dict,
+            "n_bins": self.n_bins,
+            "sigma": self.sigma,
+        }
+        base_config = super().get_config()
+        return dict(list(base_config.items()) + list(config.items()))
 
+    @classmethod
+    def from_config(cls, config):
+        return cls(**config)
+    
+
+@keras.saving.register_keras_serializable(package="TransformerLayers")
 class CatEmbeddingLayer(keras.layers.Layer):
     def __init__(self, feature_unique_counts, emb_dim, **kwargs):
         super().__init__(**kwargs)
@@ -212,7 +296,8 @@ class CatEmbeddingLayer(keras.layers.Layer):
         self.emb_dim = emb_dim
 
         self.emb_layers = {}
-        # Build embedding layers
+
+    def build(self, input_shape):
         for feature_name, unique_count in self.feature_unique_counts.items():
             emb = keras.layers.Embedding(input_dim=unique_count, output_dim=self.emb_dim)
             self.emb_layers[feature_name] = emb
@@ -226,3 +311,16 @@ class CatEmbeddingLayer(keras.layers.Layer):
 
         embs = keras.ops.stack(emb_columns, axis=2)
         return embs
+    
+    def get_config(self):
+        config = {
+            "feature_unique_counts": self.feature_unique_counts,
+            "emb_dim": self.emb_dim,
+            "emb_layers": self.emb_layers,  # Include serialized embedding layers
+        }
+        base_config = super().get_config()
+        return dict(list(base_config.items()) + list(config.items()))
+
+    @classmethod
+    def from_config(cls, config):
+        return cls(**config)

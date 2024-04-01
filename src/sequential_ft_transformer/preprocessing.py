@@ -76,8 +76,8 @@ def sq_df_to_dataset(
     input_df = input_df.copy()
     dataset = {}
 
-    empty_cat: bool = categorical_features is None
-    empty_numeric: bool = numerical_features is None
+    empty_cat: bool = categorical_features is None or len(categorical_features) == 0
+    empty_numeric: bool = numerical_features is None or len(numerical_features) == 0
 
     if empty_cat and empty_numeric:
         raise ValueError("Both categorical and numerical features are missing. At least one is needed")

@@ -1313,8 +1313,8 @@ files = [
 [package.dependencies]
 ml-dtypes = ">=0.2.0"
 numpy = [
-    {version = ">=1.23.2", markers = "python_version >= \"3.11\""},
     {version = ">=1.22", markers = "python_version < \"3.11\""},
+    {version = ">=1.23.2", markers = "python_version >= \"3.11\""},
 ]
 opt-einsum = "*"
 scipy = ">=1.9"
@@ -2126,8 +2126,8 @@ files = [
 
 [package.dependencies]
 numpy = [
-    {version = ">=1.23.3", markers = "python_version >= \"3.11\""},
     {version = ">=1.21.2", markers = "python_version >= \"3.10\" and python_version < \"3.11\""},
+    {version = ">=1.23.3", markers = "python_version >= \"3.11\""},
 ]
 
 [package.extras]
@@ -2510,8 +2510,8 @@ files = [
 
 [package.dependencies]
 numpy = [
-    {version = ">=1.23.2,<2", markers = "python_version == \"3.11\""},
     {version = ">=1.22.4,<2", markers = "python_version < \"3.11\""},
+    {version = ">=1.23.2,<2", markers = "python_version == \"3.11\""},
 ]
 python-dateutil = ">=2.8.2"
 pytz = ">=2020.1"
@@ -4372,6 +4372,17 @@ files = [
 ]
 
 [[package]]
+name = "ucimlrepo"
+version = "0.0.6"
+description = "Package to easily import datasets from the UC Irvine Machine Learning Repository into scripts and notebooks."
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "ucimlrepo-0.0.6-py3-none-any.whl", hash = "sha256:2488d85f249ca9aad39b2a2b6f915d3d25cda37543de7ab389c1ba042b2e9c61"},
+    {file = "ucimlrepo-0.0.6.tar.gz", hash = "sha256:16d1310a120ad5e362b1c83429e99560cfc1dc270407f74f77435edf50f24ec4"},
+]
+
+[[package]]
 name = "uri-template"
 version = "1.3.0"
 description = "RFC 6570 URI Template Processor"
@@ -4597,4 +4608,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<3.12"
-content-hash = "098318c7489d1af1c44f53dd4135725d262f2be49b95b74f79928d5249bc7106"
+content-hash = "89960d265630dc3b0b554e018e88a3186611327dcba24ef13e799e70dfd92994"

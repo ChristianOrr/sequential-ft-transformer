@@ -1,5 +1,7 @@
 # Local Data
 data/
+# Local Models
+models/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
