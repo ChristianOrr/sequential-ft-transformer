@@ -3,7 +3,7 @@ import urllib.request
 import numpy as np
 import pandas as pd
 import tensorflow as tf
-
+from ucimlrepo import fetch_ucirepo 
 
 def pad_df(
     df: pd.DataFrame, 
@@ -140,6 +140,28 @@ def download_data(
 
     if not os.path.exists(filepath):
         urllib.request.urlretrieve(url, filepath)
+        print(f"Downloaded {filename} to {data_folder}")
+    else:
+        print(f"{filename} already exists in {data_folder}")
+
+
+def download_wine_dataset(
+    data_folder: str = "../data", 
+    filename: str = "wine_quality"
+):  
+
+    inputs_filepath = f"{os.path.join(data_folder, filename)}_inputs.csv"
+    labels_filepath = f"{os.path.join(data_folder, filename)}_labels.csv"
+
+    # Create the data folder if it doesn't exist
+    os.makedirs(data_folder, exist_ok=True)
+
+    if not os.path.exists(inputs_filepath) or not os.path.exists(labels_filepath):
+        wine_quality = fetch_ucirepo(id=186)
+        x = wine_quality["data"]["features"]
+        y = wine_quality["data"]["targets"]
+        x.to_csv(inputs_filepath, index=False, header=True)
+        y.to_csv(labels_filepath, index=False, header=True)
         print(f"Downloaded {filename} to {data_folder}")
     else:
         print(f"{filename} already exists in {data_folder}")

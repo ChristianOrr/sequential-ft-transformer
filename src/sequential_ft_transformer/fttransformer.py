@@ -45,9 +45,9 @@ class CLSWeightsLayer(keras.layers.Layer):
 @keras.saving.register_keras_serializable(package="TransformerLayers")
 class FTTransformerEncoder(keras.layers.Layer):
     def __init__(self,
-                categorical_features: List[str],
-                numerical_features: List[str],
-                feature_unique_counts: Dict[str, int],
+                categorical_features: List[str] = None,
+                numerical_features: List[str] = None,
+                feature_unique_counts: Dict[str, int] = None,
                 seq_length: int = 1,
                 embedding_dim: int = 16,
                 depth: int = 4,
@@ -104,10 +104,7 @@ class FTTransformerEncoder(keras.layers.Layer):
             for _ in range(self.depth)
         ]
 
-    def call(self, inputs):
-        # numeric and/or cat inputs can be provided
-        numeric_inputs = inputs.get("numeric_inputs")
-        cat_inputs = inputs.get("cat_inputs")
+    def call(self, numeric_inputs=None, cat_inputs=None):
         # Process CLS weights
         cls_weights = self.cls_weights_layer(numeric_inputs if numeric_inputs is not None else cat_inputs)
 
@@ -173,7 +170,7 @@ class FTTransformer(keras.Model):
         self,
         out_dim: int,
         out_activation: str,
-        feature_unique_counts: Dict[str, int],
+        feature_unique_counts: Dict[str, int] = None,
         categorical_features: List[str] = None,
         numerical_features: List[str] = None,
         seq_length: int = 1,
@@ -186,11 +183,11 @@ class FTTransformer(keras.Model):
         bins_dict: Optional[Dict[str, List[float]]] = None,
         n_bins: Optional[int] = None,
         explainable: bool = False,
+        dtype: str = None, # The saved model wont load without this argument
         **kwargs,
     ):
-        super().__init__(**kwargs)
         self.out_dim = out_dim
-        self.out_activation = keras.activations.get(out_activation)  # Get activation function
+        self.out_activation = keras.activations.get(out_activation)
         self.feature_unique_counts = feature_unique_counts
         self.categorical_features = categorical_features
         self.numerical_features = numerical_features
@@ -205,13 +202,12 @@ class FTTransformer(keras.Model):
         self.n_bins = n_bins
         self.explainable = explainable
 
-    def build(self, input_shape):
+        # Initialize all the layers
         self.ln = keras.layers.LayerNormalization(epsilon=1e-6)
         self.flatten = keras.layers.Flatten()
         self.dense1 = keras.layers.Dense(self.embedding_dim * self.seq_length // 2, activation="relu")
         self.dense2 = keras.layers.Dense(self.embedding_dim * self.seq_length // 4, activation="relu")
         self.output_layer = keras.layers.Dense(self.out_dim, activation=self.out_activation, name="output")
-
         self.transformer_encoder = FTTransformerEncoder(
             categorical_features=self.categorical_features,
             numerical_features=self.numerical_features,
@@ -227,9 +223,29 @@ class FTTransformer(keras.Model):
             n_bins=self.n_bins,
             explainable=self.explainable,
         )
+        # Construct the network to allow for saving and loading the model
+        inputs_layer = dict()
+        empty_cat: bool = categorical_features is None or len(categorical_features) == 0
+        empty_numeric: bool = numerical_features is None or len(numerical_features) == 0
+        if not empty_cat:
+            cat_inputs = keras.layers.Input(shape=(self.seq_length, len(self.categorical_features)))
+            inputs_layer.update({"cat_inputs": cat_inputs})
+        if not empty_numeric:
+            numeric_inputs = keras.layers.Input(shape=(self.seq_length, len(self.numerical_features)))
+            inputs_layer.update({"numeric_inputs": numeric_inputs})
 
+        outputs_layer = self.call(inputs_layer)
+
+        super(FTTransformer, self).__init__(inputs=inputs_layer,
+                                        outputs=outputs_layer,
+                                        **kwargs)
+    
     def call(self, inputs):
-        x = self.transformer_encoder(inputs)
+        # numeric and/or cat inputs can be provided
+        numeric_inputs = inputs.get("numeric_inputs")
+        cat_inputs = inputs.get("cat_inputs")
+        x = self.transformer_encoder(numeric_inputs=numeric_inputs, cat_inputs=cat_inputs)
+
         layer_norm_cls = self.ln(x[:, :, 0, :])
         layer_norm_cls = self.flatten(layer_norm_cls)
         layer_norm_cls = self.dense1(layer_norm_cls)
