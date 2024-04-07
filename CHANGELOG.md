@@ -2,6 +2,13 @@
 
 
 
+## v0.3.3 (2024-04-07)
+
+### Fix
+
+* fix(loading): updated the subclassed model to be able to save and load the model with its weights ([`a65fbeb`](https://github.com/ChristianOrr/sequential-ft-transformer/commit/a65fbebd3a10ccfb74511a243eaffe0b64737a1a))
+
+
 ## v0.3.2 (2024-04-01)
 
 ### Fix
