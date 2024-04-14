@@ -27,7 +27,8 @@ sphinx-autoapi = "^3.0.0"
 sphinx-rtd-theme = "^2.0.0"
 python-semantic-release = "^8.3.0"
 ucimlrepo = "^0.0.6"
-jax[cpu] = "^0.4.25"
+jax = "^0.4.25"
+jaxlib = "^0.4.25"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
