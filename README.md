@@ -1,6 +1,6 @@
-# sequential_ft_transformer
+# Sequential FT-Transformer
 
-FT Transformer applied to sequential tabular data
+This is an adaptation of the FT-Transformer model architecture for sequential data. The model has been reworked from Antons Ruberts Tensorflow FT-Transformer implementation. In addition to changing the model to support sequential data, the model has undergone numerous changes to enable support for Keras 3. Some design changes have also been made to allow for more flexibility. For example the old implementation required passing numpy arrays through the model to create the bins for the PLE numerical embedding layer. This has been moved out of the model, since it creates a bottlneck when performing distributed training using Horovod for example.
 
 ## Installation
 
@@ -10,7 +10,7 @@ $ pip install sequential_ft_transformer
 
 ## Usage
 
-- TODO
+The notebooks folder shows multiple examples of the FT-Transformer being used in different situations. 
 
 ## Contributing
 
@@ -20,6 +20,8 @@ Interested in contributing? Check out the contributing guidelines. Please note t
 
 `sequential_ft_transformer` was created by Christian Orr. It is licensed under the terms of the MIT license.
 
-## Credits
+## References
 
-`sequential_ft_transformer` was created with [`cookiecutter`](https://cookiecutter.readthedocs.io/en/latest/) and the `py-pkgs-cookiecutter` [template](https://github.com/py-pkgs/py-pkgs-cookiecutter).
+- [FT-Transformer] - [Revisiting Deep Learning Models for Tabular Data](https://arxiv.org/pdf/2106.11959)
+- [Numerical Embeddings] - [OnEmbeddings for Numerical Features in Tabular Deep Learning](https://arxiv.org/abs/2203.05556)
+- [Antons Ruberts Tensorflow FT-Transformer] - [TabTransformerTF](https://github.com/aruberts/TabTransformerTF)
