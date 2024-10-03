@@ -1,6 +1,30 @@
 # CHANGELOG
 
+## v0.4.0 (2024-10-03)
 
+### Documentation
+
+* docs: updated the readme ([`e6a3ac2`](https://github.com/ChristianOrr/sequential-ft-transformer/commit/e6a3ac292de163062af27321a857f96a0c057836))
+
+### Feature
+
+* feat(keras update): Updated keras to v3.5 and added back support for feature importances using attention weights ([`987ce08`](https://github.com/ChristianOrr/sequential-ft-transformer/commit/987ce08c50ff9eb1286461a94aa883fbb98e8f6a))
+
+### Refactor
+
+* refactor(packages): moved jax backend to test dependencies ([`ac5e333`](https://github.com/ChristianOrr/sequential-ft-transformer/commit/ac5e333591cbcee7b159c6bdc924ab3241b42c90))
+
+### Test
+
+* test(package): updated lock file with the jaxlib new version ([`51f9109`](https://github.com/ChristianOrr/sequential-ft-transformer/commit/51f91092cca99b4c2f008294c0045860b572cd04))
+
+* test(package): fixed jaxlib to the same version as jax to prevent version conflict during testing ([`5b925d9`](https://github.com/ChristianOrr/sequential-ft-transformer/commit/5b925d9ae7f948132f4ae012b351c6a390f8a848))
+
+* test(package): added jaxlib to lock file ([`e833241`](https://github.com/ChristianOrr/sequential-ft-transformer/commit/e8332418dcf6e08f44452b095655ac32f4e43a57))
+
+* test(package): added jaxlib package for testing ([`e01abbf`](https://github.com/ChristianOrr/sequential-ft-transformer/commit/e01abbfe55d137b2fa2b79feb74ab2733bc7310a))
+
+* test(end-to-end): added an end to end training, saving the model loading the model and comparing the models results test ([`4b22f5f`](https://github.com/ChristianOrr/sequential-ft-transformer/commit/4b22f5f90e09b61c134ae14a5523bd32b9f306be))
 
 ## v0.3.3 (2024-04-07)
 
@@ -8,20 +32,17 @@
 
 * fix(loading): updated the subclassed model to be able to save and load the model with its weights ([`a65fbeb`](https://github.com/ChristianOrr/sequential-ft-transformer/commit/a65fbebd3a10ccfb74511a243eaffe0b64737a1a))
 
-
 ## v0.3.2 (2024-04-01)
 
 ### Fix
 
 * fix(loading): added get and from config methods for all layers to ensure loading and saving the model successfully ([`5fb3cde`](https://github.com/ChristianOrr/sequential-ft-transformer/commit/5fb3cde3bbf74372633719679915908e24749fcb))
 
-
 ## v0.3.1 (2024-03-31)
 
 ### Fix
 
 * fix(keras): converted all layers to keras subclassed layers and the model to a subclassed model for keras 3 integration ([`085a3a6`](https://github.com/ChristianOrr/sequential-ft-transformer/commit/085a3a607d64bcb43e0f6c8898ca8cc8bcd64457))
-
 
 ## v0.3.0 (2024-03-30)
 
@@ -39,20 +60,17 @@
 
 * refactor(ci-cd): refactored the ci-cd pipeline to look at the previous 1 commit instead of 2 to get the prev version ([`6a9bbac`](https://github.com/ChristianOrr/sequential-ft-transformer/commit/6a9bbac9898c256d7f8af467c723884f8ea6b063))
 
-
 ## v0.2.5 (2024-02-04)
 
 ### Fix
 
 * fix(embeddings): Converted linear and periodic embedding layers to keras subclassed layers to prevent serialization errors when saving ([`6cc101c`](https://github.com/ChristianOrr/sequential-ft-transformer/commit/6cc101c3a6102fd04b126f96fc62467354f0a0ca))
 
-
 ## v0.2.4 (2024-01-20)
 
 ### Fix
 
 * fix(transoformer): fixed layernorm crashing on gpu without epsilon argument and fix transformer wasnt going passed depth level 1 ([`779c576`](https://github.com/ChristianOrr/sequential-ft-transformer/commit/779c5768a87818a6b83d7a40d41b23fd9ab4fefd))
-
 
 ## v0.2.3 (2024-01-02)
 
@@ -84,20 +102,17 @@
 
 * refactor(ple): moved ple bins calculations out of the model, its now passed as an argument ([`558cfb6`](https://github.com/ChristianOrr/sequential-ft-transformer/commit/558cfb6ce98578723becd0d0545743ed0b736cf3))
 
-
 ## v0.2.2 (2023-12-30)
 
 ### Fix
 
 * fix(ple): updated piecewise linear embedding layer to work with sequential input data ([`e89504e`](https://github.com/ChristianOrr/sequential-ft-transformer/commit/e89504e3188032128eb1c3d88b993cb8b3c199e7))
 
-
 ## v0.2.1 (2023-12-29)
 
 ### Fix
 
 * fix(embedding): updated the periodic numerical embedding layer to work with sequential inputs ([`42b4d8e`](https://github.com/ChristianOrr/sequential-ft-transformer/commit/42b4d8ed85eaa0b7ec48cddac9a99f9617194111))
-
 
 ## v0.2.0 (2023-12-29)
 
@@ -109,13 +124,11 @@
 
 * feat(model): updated ft-transformer model to support sequential tabular data ([`95ae501`](https://github.com/ChristianOrr/sequential-ft-transformer/commit/95ae5010ab9b82c8528089fd968a89541179ce86))
 
-
 ## v0.1.0 (2023-12-24)
 
 ### Feature
 
 * feat(model): converted ft-transformer to tensorflow functional api ([`500dae6`](https://github.com/ChristianOrr/sequential-ft-transformer/commit/500dae68d18d405e57c464259daa372009cd40e4))
-
 
 ## v0.0.2 (2023-12-16)
 
@@ -137,7 +150,6 @@
 
 * refactor: updated build config version for toml ([`26cf97f`](https://github.com/ChristianOrr/sequential-ft-transformer/commit/26cf97feda3fda52ae9c21f354c1e5356c765d7a))
 
-
 ## v0.0.1 (2023-12-15)
 
 ### Unknown
@@ -155,7 +167,6 @@
 * test (pipeline): showing folder contents ([`265d807`](https://github.com/ChristianOrr/sequential-ft-transformer/commit/265d8070e74de816eb9838ef996b851db2c86f51))
 
 * fix (pipeline): install semantic release ([`0b8a89c`](https://github.com/ChristianOrr/sequential-ft-transformer/commit/0b8a89c9efc0b16270b4bd6eb3c1d6668f699e07))
-
 
 ## v0.0.0 (2023-12-09)
 
