@@ -33,21 +33,27 @@ class TransformerBlock(keras.layers.Layer):
     def call(self, inputs):
         if self.post_norm:
             normalized_inputs = self.layernorm1(inputs)
-            attention_output = self.att(normalized_inputs, normalized_inputs)
+            if self.explainable:
+                attention_output, attention_weights = self.att(normalized_inputs, normalized_inputs, return_attention_scores=True)
+            else:
+                attention_output = self.att(normalized_inputs, normalized_inputs, return_attention_scores=False)
             attention_output = self.skip1([inputs, attention_output])
             ff_output = self.ffn(attention_output)
             output = self.skip2([ff_output, attention_output])
             output = self.layernorm2(output)
         else:
             normalized_inputs = self.layernorm1(inputs)
-            attention_output = self.att(normalized_inputs, normalized_inputs)
+            if self.explainable:
+                attention_output, attention_weights = self.att(normalized_inputs, normalized_inputs, return_attention_scores=True)
+            else:
+                attention_output = self.att(normalized_inputs, normalized_inputs, return_attention_scores=False)
             attention_output = self.skip1([inputs, attention_output])
             normalized_att_output = self.layernorm2(attention_output)
             ff_output = self.ffn(normalized_att_output)
             output = self.skip2([ff_output, attention_output])
 
         if self.explainable:
-            return output, self.att.attention_weights  # Access attention weights from MultiHeadAttention
+            return output, attention_weights
         else:
             return output
         

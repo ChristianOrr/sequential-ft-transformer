@@ -244,7 +244,10 @@ class FTTransformer(keras.Model):
         # numeric and/or cat inputs can be provided
         numeric_inputs = inputs.get("numeric_inputs")
         cat_inputs = inputs.get("cat_inputs")
-        x = self.transformer_encoder(numeric_inputs=numeric_inputs, cat_inputs=cat_inputs)
+        if self.transformer_encoder.explainable:
+            x, importances = self.transformer_encoder(numeric_inputs=numeric_inputs, cat_inputs=cat_inputs)
+        else:
+            x = self.transformer_encoder(numeric_inputs=numeric_inputs, cat_inputs=cat_inputs)
 
         layer_norm_cls = self.ln(x[:, :, 0, :])
         layer_norm_cls = self.flatten(layer_norm_cls)
@@ -253,7 +256,7 @@ class FTTransformer(keras.Model):
         output = self.output_layer(layer_norm_cls)
 
         if self.transformer_encoder.explainable:
-            return output, self.transformer_encoder.expl
+            return output, importances
         else:
             return output
         
